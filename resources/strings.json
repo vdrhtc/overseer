@@ -1,0 +1,5 @@
+{
+  "greeting": "Hi!\n /subscribe command will subscribe you to updates\n /unsubscribe will remove you from the list\n /scheme will show you the valve map",
+  "no_slave_nickname":"You need to provide your client's external IP like this: /subscribe 133.45.1.1",
+  "fetching_updates":"Getting updates for %s..."
+}
