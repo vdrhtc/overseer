@@ -9,7 +9,7 @@ class UpdateServer:
 
     def __init__(self):
 
-        self._host = socket.gethostname()
+        self._host = "0.0.0.0"
         self._port = 5000  # initiate port no above 1024
         self._stop = False
         self._socket = None

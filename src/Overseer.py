@@ -5,18 +5,20 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 from threading import Lock
 import pickle
 
+from src.DBOperator import DBOperator
 from src.LoggingServer import LoggingServer
 from src.ResourseManager import ResourceManager
 
 
 class Overseer:
 
-    def __init__(self, broadcaster):
+    def __init__(self, broadcaster, db_operator: DBOperator):
         """
 
         :type broadcaster: src.Broadcaster.Broadcaster
         """
         self._broadcaster = broadcaster
+        self._db_operator = db_operator
         self._updater = broadcaster.get_telegram_updater()
 
         self._resource_manager = ResourceManager()
@@ -56,28 +58,21 @@ class Overseer:
 
     def on_subscribe(self, bot, update):
 
-        try:
-            client_ip = (update.message.text[11:])
-        except IndexError:
-            update.message.reply_text(self._resourceManager.getString("no_client_ip"))
+        slave_nickname = update.message.text[11:]
 
-        info_message_id = update.message.reply_text("Getting updates for %s..."%client_ip).message_id
+        if slave_nickname == "":
+            update.message.reply_text(self._resource_manager.get_string("no_slave_nickname"))
+            return
 
-        with self._lock:
-            with open("resources/subscribers.pkl", "rb") as f:
-                subscribers = pickle.load(f)
+        user_telegram_id = update.message.chat_id
 
-            try:
-                ips = subscribers[update.message.chat_id][1]
-                ips.add(client_ip)
-                subscribers[update.message.chat_id] = (info_message_id, ips)
-            except KeyError:
-                ips = set()
-                ips.add(client_ip)
-                subscribers[update.message.chat_id] = (info_message_id, ips)
+        self._db_operator.add_user(user_telegram_id)
+        self._db_operator.add_slave(slave_nickname, None)
 
-            with open("resources/subscribers.pkl", "wb") as f:
-                pickle.dump(subscribers, f)
+        info_message_id = update.message.reply_text(self._resource_manager
+                                                    .get_string("fetching_updates") % slave_nickname).message_id
+
+        self._db_operator.subscribe(user_telegram_id, slave_nickname, info_message_id)
 
     def on_unsubscribe(self, bot, update):
         with self._lock:
