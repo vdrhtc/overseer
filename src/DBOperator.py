@@ -15,6 +15,17 @@ class DBOperator:
         self._conn = psycopg2.connect("dbname=%s user=%s password=%s" % (dbname, user, password))
         self._c = self._conn.cursor()
 
+        if len(self.get_tables()) == 0:
+            self.create_tables()
+
+    def get_tables(self):
+        with self._conn:
+            query = """SELECT table_name 
+                       FROM information_schema.tables 
+                       WHERE table_schema = 'public' 
+                       ORDER BY table_schema,table_name;"""
+            self._c.execute(query)
+            return self._c.fetchall()
 
 
     def create_tables(self):
@@ -98,16 +109,18 @@ class DBOperator:
 
         user_id = self._get_user_id(telegram_id)
         slave_id = self._get_slave_id(slave_nickname)
+        sub_date = datetime.now()
 
         try:
-            sub_date = datetime.now()
-
             query = "INSERT INTO subscriptions (user_id, slave_id, sub_date, info_message_id) VALUES (%s, %s, %s, %s);"
             self._c.execute(query, [user_id, slave_id, sub_date, info_message_id])
             self._conn.commit()
-        except IntegrityError:
+        except IntegrityError:  # user is already subscribed to slave
             self._conn.rollback()
-            raise ValueError("User %d is already subscribed to slave %s" % (telegram_id, slave_nickname))
+            with self._conn:
+                query = "UPDATE subscriptions SET info_message_id = %s, sub_date = %s WHERE user_id = %s AND slave_id = %s"
+                self._c.execute(query, [info_message_id, sub_date, user_id, slave_id])
+
 
     def unsubscribe(self, telegram_id, slave_nickname):
 

@@ -93,14 +93,20 @@ class DBOperatorTest(unittest.TestCase):
         except ValueError as e:
             self.assertEqual(e.args[0], "Slave %s not found"%"slave1")
 
+    def testDoubleSubscribe(self):
         # double subscribe
+        telegram_id = 123459
+
+        self._sut.add_user(telegram_id)
         self._sut.add_slave("slave1", "0.0.0.0")
         self._sut.subscribe(telegram_id, "slave1", 11)
-        try:
-            self._sut.subscribe(telegram_id, "slave1", 11)
-        except ValueError as e:
-            self.assertEqual(e.args[0],
-                             "User 123459 is already subscribed to slave slave1")
+
+        slaves = self._sut.get_subscriptions(telegram_id)
+        self.assertListEqual(slaves, [("slave1", 11)])
+
+        self._sut.subscribe(telegram_id, "slave1", 12)
+        slaves = self._sut.get_subscriptions(telegram_id)
+        self.assertListEqual(slaves, [("slave1", 12)])
 
     def testUnsubscribe(self):
 
@@ -122,3 +128,10 @@ class DBOperatorTest(unittest.TestCase):
         slaves = self._sut.get_subscriptions(telegram_id)
 
         self.assertListEqual(slaves, [])
+
+        with self.assertRaises(ValueError):
+            self._sut.unsubscribe(telegram_id, "slave2123123") # no such slave
+
+        with self.assertRaises(ValueError):
+            self._sut.unsubscribe(11, "slave2") # no such user
+
