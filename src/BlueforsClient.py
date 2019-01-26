@@ -5,17 +5,18 @@ import socket
 from datetime import datetime
 from threading import Thread
 from time import sleep
+
 from numpy import reshape, log10
 
 
 class BlueforsClient:
 
-
-    def __init__(self, server_address, server_port, logs_path):
+    def __init__(self, nickname,  server_address, server_port, logs_path):
 
         self._server_address = server_address
         self._server_port = server_port
         self._logs_path = logs_path
+        self._nickname = nickname
 
         self._socket = socket.socket()  # instantiate
         self._socket.connect((server_address, server_port))  # connect to the server
@@ -24,8 +25,10 @@ class BlueforsClient:
         self._updater = Thread(target=self._act)
         self._updater.setDaemon(True)
 
-        self._strategies = {"update":self._send_update, "reconnect":self._reconnect}
-        self._current_strategy = "update"
+        self._strategies = {"update": self._send_update,
+                            "reconnect": self._reconnect,
+                            "handshake": self._handshake}
+        self._current_strategy = "handshake"
 
     def launch(self):
         self._stop = False
@@ -38,7 +41,7 @@ class BlueforsClient:
         self._socket.close()
 
     def _send_update(self):
-        print("\rSending update, "+str(datetime.now()), end="")
+        print("\rSending update, " + str(datetime.now()), end="")
         try:
             self._socket.send(self.generate_info_message().encode())
         except ConnectionResetError:
@@ -50,9 +53,20 @@ class BlueforsClient:
             self._socket.close()
             self._socket = socket.socket()
             self._socket.connect((self._server_address, self._server_port))  # connect to the server
-            self._current_strategy = "update"
+            self._current_strategy = "handshake"
         except ConnectionRefusedError:
             pass
+
+    def _handshake(self):
+        self._socket.send(self._nickname.encode())
+        response = self._socket.recv(1024).decode()
+        if response == self._nickname:
+            self._current_strategy = "update"
+            print("Successful handshake!")
+        else:
+            print(response)
+            self._current_strategy = "reconnect"
+
 
     def generate_info_message(self):
         on_off = {"0": "⚪️", "1": "🔵", "2": '🌕'}
@@ -148,12 +162,12 @@ class BlueforsClient:
         while len(change) <= 1:
             last_state_list = self.get_state(depth)
             last_state = dict(reshape(last_state_list[3:], (-1, 2)))
-            previous_state = dict(reshape(self.get_state(depth+1)[3:], (-1, 2)))
+            previous_state = dict(reshape(self.get_state(depth + 1)[3:], (-1, 2)))
             change = dict(set(last_state.items()) - set(previous_state.items()))
-            change["change_time"] = datetime.strptime(last_state_list[0] + " " + last_state_list[1], "%d-%m-%y %H:%M:%S")
+            change["change_time"] = datetime.strptime(last_state_list[0] + " " + last_state_list[1],
+                                                      "%d-%m-%y %H:%M:%S")
             depth += 1
         return change
-
 
     def get_last_pressures(self):
         logs_path = self._logs_path
