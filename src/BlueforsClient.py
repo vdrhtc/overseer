@@ -13,7 +13,7 @@ from src.LoggingServer import LoggingServer
 
 class BlueforsClient:
 
-    def __init__(self, nickname,  server_address, server_port, logs_path):
+    def __init__(self, nickname, server_address, server_port, logs_path):
 
         self._server_address = server_address
         self._server_port = server_port
@@ -73,7 +73,6 @@ class BlueforsClient:
             print(response)
             self._current_strategy = "reconnect"
 
-
     def generate_info_message(self):
         on_off = {"0": "⚪️", "1": "🔵", "2": '🌕'}
 
@@ -104,14 +103,16 @@ class BlueforsClient:
 
         ########## Temps
         temperature_names, temperatures = self.get_last_temperatures()
-        temp_string = "`" + "\n".join(["{0:>6s}: {1:.2f} K".format(channel, float(last_temp))
+        temp_string = "`" + "\n".join(["{0:>6s}: {1:.2f} K".format(channel, float(last_temp)) if
+                                       float(last_temp) > 1 else "{0:>6s}: {1:.2f} mK".format(channel,
+                                                                                              1000 * float(last_temp))
                                        for channel, last_temp in zip(temperature_names, temperatures)]) + "`"
         ########## Pressures
         pressure_names, pressures = self.get_last_pressures()
         pressures_string = "`" + "\n".join("{0:>6s}: {1:15s}".format(name, self.format_unicode_sci(pressure) + " mBar")
                                            for name, pressure in zip(pressure_names, pressures)) + "`"
 
-        message = "%s, LX" % datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message = "%s, %s @ BF LD250" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), self._nickname)
         message += "\n\nCurrent state:\n" + state_string
         message += "\n\nLast change (" + self.format_timedelta(time_since_last_change) + " ago):\n" + changes_string
         message += "\n\nTemperatures:\n" + temp_string
