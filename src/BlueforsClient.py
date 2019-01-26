@@ -43,6 +43,7 @@ class BlueforsClient:
                 self._strategies[self._current_strategy]()
             except Exception as e:
                 self._logger.warn(str(e))
+                self._current_strategy = "reconnect"
             sleep(15)
         self._socket.close()
 
@@ -112,7 +113,7 @@ class BlueforsClient:
         pressures_string = "`" + "\n".join("{0:>6s}: {1:15s}".format(name, self.format_unicode_sci(pressure) + " mBar")
                                            for name, pressure in zip(pressure_names, pressures)) + "`"
 
-        message = "%s\n %s @ BF LD250" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), self._nickname)
+        message = "%s\n%s @ BF LD250" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), self._nickname)
         message += "\n\nCurrent state:\n" + state_string
         message += "\n\nLast change (" + self.format_timedelta(time_since_last_change) + " ago):\n" + changes_string
         message += "\n\nTemperatures:\n" + temp_string
@@ -241,7 +242,7 @@ class BlueforsClient:
 
         days = s//(3600*24)
         if days >= 2:
-            return "%s d"%int(days)
+            return "%sd"%int(days)
 
         hours, remainder = divmod(s, 3600)
         minutes, seconds = divmod(remainder, 60)
