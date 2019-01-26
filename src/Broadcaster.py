@@ -4,10 +4,12 @@ from time import sleep
 
 from telegram import ParseMode
 
+from src.DBOperator import DBOperator
+
 
 class Broadcaster:
 
-    def __init__(self, telegram_updater, update_server):
+    def __init__(self, telegram_updater, update_server, db_operator: DBOperator):
         """
 
         :type update_server: src.UpdateServer.UpdateServer
@@ -16,6 +18,7 @@ class Broadcaster:
         self._stop = False
         self._telegram_updater = telegram_updater
         self._update_server = update_server
+        self._db_operator = db_operator
         self._running = False
 
     def get_telegram_updater(self):
@@ -43,16 +46,15 @@ class Broadcaster:
         self._running = True
         while not self._stop:
             try:
-                with self._lock:
-                    with open("resources/subscribers.pkl", "rb") as f:
-                        subscribers = pickle.load(f)
-                for sub, params in subscribers.items():
-                    print("\rSubs:", len(subscribers), ", updating", sub, end="", flush=True)
+                users = self._db_operator.get_users()
+                for user in users:
+                    print("\rSubs:", len(users), ", updating", user, end="", flush=True)
 
-                    info_message_id, client_ips = params
-                    for client_ip in client_ips:
-                        message = self._update_server.get_latest_state(client_ip)
-                        self._telegram_updater.bot.edit_message_text(message, sub, info_message_id,
+                    subscriptions = self._db_operator.get_subscriptions(user)
+                    for subscription in subscriptions:
+                        slave_nickname, info_message_id = subscription
+                        message = self._update_server.get_latest_state(slave_nickname)
+                        self._telegram_updater.bot.edit_message_text(message, user, info_message_id,
                                                                      parse_mode=ParseMode.MARKDOWN)
             except Exception as e:
                 print("\r", e, end="")

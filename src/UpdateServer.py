@@ -44,6 +44,12 @@ class UpdateServer:
         self._socket.close()
 
     def _communicate(self, connection: socket.socket, address):
+
+        slave_nickname = connection.recv(1024).decode()
+        connection.send(slave_nickname.encode())
+        self._logger.debug("Successful handshake with %s" % str(slave_nickname))
+
+
         while not self._stop:
             data = connection.recv(1024).decode()
             if not data:
@@ -53,10 +59,10 @@ class UpdateServer:
 
             self._logger.debug("State update from %s of length %d" % (address[0], len(data)))
             # print("State update from %s of length %d" % (address, len(data)))
-            self._latest_states[address[0]] = data
+            self._latest_states[slave_nickname] = data
 
-    def get_latest_state(self, address):
+    def get_latest_state(self, slave_nickname):
         try:
-            return self._latest_states[address]
+            return self._latest_states[slave_nickname]
         except KeyError:
-            return "Address %s has not yet connected!" % address
+            return "Slave %s has not yet connected!" % slave_nickname
