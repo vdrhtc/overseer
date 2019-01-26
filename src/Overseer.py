@@ -75,14 +75,15 @@ class Overseer:
         self._db_operator.subscribe(user_telegram_id, slave_nickname, info_message_id)
 
     def on_unsubscribe(self, bot, update):
-        with self._lock:
-            with open("resources/subscribers.pkl", "rb") as f:
-                subscribers = pickle.load(f)
+        user_telegram_id = update.message.chat_id
+        slave_nickname = update.message.text[13:]
 
-            del subscribers[update.message.chat_id]
+        if slave_nickname == "":
+            update.message.reply_text(self._resource_manager.get_string("no_slave_nickname"))
+            return
 
-            with open("resources/subscribers.pkl", "wb") as f:
-                pickle.dump(subscribers, f)
+        self._db_operator.unsubscribe(user_telegram_id, slave_nickname)
+        update.message.reply_text(self._resource_manager.get_string("unsubscribed") % slave_nickname)
 
     def on_callback(self, bot, update):
         if update.callback_query.data == "OK":
