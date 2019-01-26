@@ -44,13 +44,13 @@ class BlueforsClient:
             except Exception as e:
                 self._logger.warn(str(e))
                 self._current_strategy = "reconnect"
-            sleep(15)
         self._socket.close()
 
     def _send_update(self):
         print("\rSending update, " + str(datetime.now()), end="")
         try:
             self._socket.send(self.generate_info_message().encode())
+            sleep(15)
         except ConnectionResetError:
             self._current_strategy = "reconnect"
 
@@ -62,7 +62,7 @@ class BlueforsClient:
             self._socket.connect((self._server_address, self._server_port))  # connect to the server
             self._current_strategy = "handshake"
         except ConnectionRefusedError:
-            pass
+            sleep(15)
 
     def _handshake(self):
         self._socket.send(self._nickname.encode())
