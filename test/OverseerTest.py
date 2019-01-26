@@ -61,4 +61,22 @@ class OverseerTest(unittest.TestCase):
 
         self.assertIn(("slave1", 11), self._db_operator.get_subscriptions(telegram_id))
 
+    def testOnUnsubscribe(self):
 
+        telegram_id = 123456
+
+        self._db_operator.add_user(telegram_id)
+        self._db_operator.add_slave("slave1", "0.0.0.0")
+        self._db_operator.subscribe(telegram_id, "slave1", 11)
+
+        update = Mock()
+        update.message.chat_id = telegram_id
+        reply_message = Mock()
+        update.message.reply_text = Mock(return_value=reply_message)
+        update.message.text = "/unsubscribe slave1"
+
+        self._sut.on_unsubscribe(None, update)
+
+        self.assertNotIn(("slave1", 11),
+                         self._db_operator.get_subscriptions(telegram_id))
+        update.message.reply_text.assert_called_with(self._rm.get_string("unsubscribed") % "slave1")

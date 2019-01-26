@@ -101,3 +101,24 @@ class DBOperatorTest(unittest.TestCase):
         except ValueError as e:
             self.assertEqual(e.args[0],
                              "User 123459 is already subscribed to slave slave1")
+
+    def testUnsubscribe(self):
+
+        telegram_id = 123459
+        self._sut.add_user(telegram_id)
+        self._sut.add_slave("slave1", "0.0.0.0")
+        self._sut.add_slave("slave2", "0.0.0.0")
+
+        self._sut.subscribe(telegram_id, "slave1", 11)
+        self._sut.subscribe(telegram_id, "slave2", 12)
+
+        slaves = self._sut.get_subscriptions(telegram_id)
+
+        self.assertListEqual(slaves, [("slave1", 11), ("slave2", 12)])
+
+        self._sut.unsubscribe(telegram_id, "slave1")
+        self._sut.unsubscribe(telegram_id, "slave2")
+
+        slaves = self._sut.get_subscriptions(telegram_id)
+
+        self.assertListEqual(slaves, [])
