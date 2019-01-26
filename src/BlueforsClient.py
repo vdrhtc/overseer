@@ -8,6 +8,8 @@ from time import sleep
 
 from numpy import reshape, log10
 
+from src.LoggingServer import LoggingServer
+
 
 class BlueforsClient:
 
@@ -17,6 +19,7 @@ class BlueforsClient:
         self._server_port = server_port
         self._logs_path = logs_path
         self._nickname = nickname
+        self._logger = LoggingServer.getInstance()
 
         self._socket = socket.socket()  # instantiate
         self._socket.connect((server_address, server_port))  # connect to the server
@@ -36,7 +39,10 @@ class BlueforsClient:
 
     def _act(self):
         while not self._stop:
-            self._strategies[self._current_strategy]()
+            try:
+                self._strategies[self._current_strategy]()
+            except Exception as e:
+                self._logger.warn(str(e))
             sleep(15)
         self._socket.close()
 
