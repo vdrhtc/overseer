@@ -239,7 +239,7 @@ class BlueforsClient:
     def format_timedelta(td):
         s = td.total_seconds()
 
-        days = divmod(s, 3600)
+        days = s//3600
         if days >= 2:
             return "%s d"%int(days)
 
