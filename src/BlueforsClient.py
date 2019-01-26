@@ -38,7 +38,7 @@ class BlueforsClient:
         self._socket.close()
 
     def _send_update(self):
-        print("Sending update")
+        print("\rSending update, "+str(datetime.now()), end="")
         try:
             self._socket.send(self.generate_info_message().encode())
         except ConnectionResetError:
@@ -106,7 +106,13 @@ class BlueforsClient:
         date_idx = -1
         date = dates[date_idx]
 
-        status_file = [file for file in os.listdir(logs_path + date) if bool(re.search("Status", file))][0]
+        try:
+            status_file = [file for file in os.listdir(logs_path + date) if bool(re.search("Status", file))][0]
+        except IndexError:
+            date_idx -= 1
+            date = dates[date_idx]
+            status_file = [file for file in os.listdir(logs_path + date) if bool(re.search("Status", file))][0]
+
         with open(logs_path + date + "/" + status_file, "r") as f:
             statuses = f.readlines()
 
@@ -119,7 +125,7 @@ class BlueforsClient:
         dates = os.listdir(logs_path)[:]
         dates = list(filter(re.compile(r'(\d+-\d+-\d+)').match, dates))
         date_idx = -1
-        date = None
+
         states = []
         while len(states) < depth + 1:  # gathering states from
             date = dates[date_idx]
@@ -136,11 +142,16 @@ class BlueforsClient:
         return states[-(depth + 1)]
 
     def get_last_state_change(self):
-        last_state_list = self.get_state(0)
-        last_state = dict(reshape(last_state_list[3:], (-1, 2)))
-        previous_state = dict(reshape(self.get_state(1)[3:], (-1, 2)))
-        change = dict(set(last_state.items()) - set(previous_state.items()))
-        change["change_time"] = datetime.strptime(last_state_list[0] + " " + last_state_list[1], "%d-%m-%y %H:%M:%S")
+
+        change = {}
+        depth = 0
+        while len(change) <= 1:
+            last_state_list = self.get_state(depth)
+            last_state = dict(reshape(last_state_list[3:], (-1, 2)))
+            previous_state = dict(reshape(self.get_state(depth+1)[3:], (-1, 2)))
+            change = dict(set(last_state.items()) - set(previous_state.items()))
+            change["change_time"] = datetime.strptime(last_state_list[0] + " " + last_state_list[1], "%d-%m-%y %H:%M:%S")
+            depth += 1
         return change
 
 
@@ -149,7 +160,11 @@ class BlueforsClient:
         dates = os.listdir(logs_path)[:]
         dates = list(filter(re.compile(r'(\d+-\d+-\d+)').match, dates))
         date = dates[-1]
-        maxigauge_file = [file for file in os.listdir(logs_path + date) if bool(re.search("maxigauge", file))][0]
+        try:
+            maxigauge_file = [file for file in os.listdir(logs_path + date) if bool(re.search("maxigauge", file))][0]
+        except IndexError:
+            date = dates[-2]
+            maxigauge_file = [file for file in os.listdir(logs_path + date) if bool(re.search("maxigauge", file))][0]
 
         with open(logs_path + date + "/" + maxigauge_file, "r") as f:
             maxigauge = f.readlines()
@@ -187,7 +202,7 @@ class BlueforsClient:
     @staticmethod
     def format_unicode_sci(number):
         try:
-            exponent = round(log10(number))
+            exponent = int(round(log10(number)))
             if exponent < 0:
                 mantis = number / 10 ** exponent
 
