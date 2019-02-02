@@ -1,3 +1,4 @@
+import os
 from multiprocessing import Queue
 from threading import Thread
 
@@ -7,8 +8,14 @@ from logging.handlers import TimedRotatingFileHandler
 
 
 class LoggingServer:
-    loggingHandler = TimedRotatingFileHandler(
-        'log/overseer.log', when="midnight", backupCount=1)
+    try:
+        loggingHandler = TimedRotatingFileHandler(
+            'log/overseer.log', when="midnight", backupCount=1)
+    except FileNotFoundError:
+        os.mkdir("log")
+        loggingHandler = TimedRotatingFileHandler(
+            'log/overseer.log', when="midnight", backupCount=1)
+
     loggingFormat = '%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s'
     loggingFormatter = Formatter(fmt=loggingFormat, datefmt='%I:%M:%S')
     loggingHandler.setFormatter(loggingFormatter)

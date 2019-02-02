@@ -5,17 +5,21 @@ import socket
 from datetime import datetime
 from threading import Thread
 from time import sleep
+
 from numpy import reshape, log10
+
+from src.LoggingServer import LoggingServer
 
 
 class BlueforsClient:
 
-
-    def __init__(self, server_address, server_port, logs_path):
+    def __init__(self, nickname, server_address, server_port, logs_path):
 
         self._server_address = server_address
         self._server_port = server_port
         self._logs_path = logs_path
+        self._nickname = nickname
+        self._logger = LoggingServer.getInstance()
 
         self._socket = socket.socket()  # instantiate
         self._socket.connect((server_address, server_port))  # connect to the server
@@ -24,8 +28,10 @@ class BlueforsClient:
         self._updater = Thread(target=self._act)
         self._updater.setDaemon(True)
 
-        self._strategies = {"update":self._send_update, "reconnect":self._reconnect}
-        self._current_strategy = "update"
+        self._strategies = {"update": self._send_update,
+                            "reconnect": self._reconnect,
+                            "handshake": self._handshake}
+        self._current_strategy = "handshake"
 
     def launch(self):
         self._stop = False
@@ -33,14 +39,18 @@ class BlueforsClient:
 
     def _act(self):
         while not self._stop:
-            self._strategies[self._current_strategy]()
-            sleep(15)
+            try:
+                self._strategies[self._current_strategy]()
+            except Exception as e:
+                self._logger.warn(str(e))
+                self._current_strategy = "reconnect"
         self._socket.close()
 
     def _send_update(self):
-        print("Sending update")
+        print("\rSending update, " + str(datetime.now()), end="")
         try:
             self._socket.send(self.generate_info_message().encode())
+            sleep(15)
         except ConnectionResetError:
             self._current_strategy = "reconnect"
 
@@ -50,9 +60,19 @@ class BlueforsClient:
             self._socket.close()
             self._socket = socket.socket()
             self._socket.connect((self._server_address, self._server_port))  # connect to the server
-            self._current_strategy = "update"
+            self._current_strategy = "handshake"
         except ConnectionRefusedError:
-            pass
+            sleep(15)
+
+    def _handshake(self):
+        self._socket.send(self._nickname.encode())
+        response = self._socket.recv(1024).decode()
+        if response == self._nickname:
+            self._current_strategy = "update"
+            print("Successful handshake!")
+        else:
+            print(response)
+            self._current_strategy = "reconnect"
 
     def generate_info_message(self):
         on_off = {"0": "⚪️", "1": "🔵", "2": '🌕'}
@@ -84,14 +104,16 @@ class BlueforsClient:
 
         ########## Temps
         temperature_names, temperatures = self.get_last_temperatures()
-        temp_string = "`" + "\n".join(["{0:>6s}: {1:.2f} K".format(channel, float(last_temp))
+        temp_string = "`" + "\n".join(["{0:>6s}: {1:.2f} K".format(channel, float(last_temp)) if
+                                       float(last_temp) > 1 else "{0:>6s}: {1:.2f} mK".format(channel,
+                                                                                              1000 * float(last_temp))
                                        for channel, last_temp in zip(temperature_names, temperatures)]) + "`"
         ########## Pressures
         pressure_names, pressures = self.get_last_pressures()
         pressures_string = "`" + "\n".join("{0:>6s}: {1:15s}".format(name, self.format_unicode_sci(pressure) + " mBar")
                                            for name, pressure in zip(pressure_names, pressures)) + "`"
 
-        message = "%s, LX" % datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message = "%s\n%s @ BF LD250" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), self._nickname)
         message += "\n\nCurrent state:\n" + state_string
         message += "\n\nLast change (" + self.format_timedelta(time_since_last_change) + " ago):\n" + changes_string
         message += "\n\nTemperatures:\n" + temp_string
@@ -106,7 +128,13 @@ class BlueforsClient:
         date_idx = -1
         date = dates[date_idx]
 
-        status_file = [file for file in os.listdir(logs_path + date) if bool(re.search("Status", file))][0]
+        try:
+            status_file = [file for file in os.listdir(logs_path + date) if bool(re.search("Status", file))][0]
+        except IndexError:
+            date_idx -= 1
+            date = dates[date_idx]
+            status_file = [file for file in os.listdir(logs_path + date) if bool(re.search("Status", file))][0]
+
         with open(logs_path + date + "/" + status_file, "r") as f:
             statuses = f.readlines()
 
@@ -119,7 +147,7 @@ class BlueforsClient:
         dates = os.listdir(logs_path)[:]
         dates = list(filter(re.compile(r'(\d+-\d+-\d+)').match, dates))
         date_idx = -1
-        date = None
+
         states = []
         while len(states) < depth + 1:  # gathering states from
             date = dates[date_idx]
@@ -136,20 +164,29 @@ class BlueforsClient:
         return states[-(depth + 1)]
 
     def get_last_state_change(self):
-        last_state_list = self.get_state(0)
-        last_state = dict(reshape(last_state_list[3:], (-1, 2)))
-        previous_state = dict(reshape(self.get_state(1)[3:], (-1, 2)))
-        change = dict(set(last_state.items()) - set(previous_state.items()))
-        change["change_time"] = datetime.strptime(last_state_list[0] + " " + last_state_list[1], "%d-%m-%y %H:%M:%S")
-        return change
 
+        change = {}
+        depth = 0
+        while len(change) <= 1:
+            last_state_list = self.get_state(depth)
+            last_state = dict(reshape(last_state_list[3:], (-1, 2)))
+            previous_state = dict(reshape(self.get_state(depth + 1)[3:], (-1, 2)))
+            change = dict(set(last_state.items()) - set(previous_state.items()))
+            change["change_time"] = datetime.strptime(last_state_list[0] + " " + last_state_list[1],
+                                                      "%d-%m-%y %H:%M:%S")
+            depth += 1
+        return change
 
     def get_last_pressures(self):
         logs_path = self._logs_path
         dates = os.listdir(logs_path)[:]
         dates = list(filter(re.compile(r'(\d+-\d+-\d+)').match, dates))
         date = dates[-1]
-        maxigauge_file = [file for file in os.listdir(logs_path + date) if bool(re.search("maxigauge", file))][0]
+        try:
+            maxigauge_file = [file for file in os.listdir(logs_path + date) if bool(re.search("maxigauge", file))][0]
+        except IndexError:
+            date = dates[-2]
+            maxigauge_file = [file for file in os.listdir(logs_path + date) if bool(re.search("maxigauge", file))][0]
 
         with open(logs_path + date + "/" + maxigauge_file, "r") as f:
             maxigauge = f.readlines()
@@ -187,7 +224,7 @@ class BlueforsClient:
     @staticmethod
     def format_unicode_sci(number):
         try:
-            exponent = round(log10(abs(number)))
+            exponent = int(round(log10(abs(number))))
             if exponent < 0:
                 mantis = number / 10 ** exponent
 
@@ -202,6 +239,11 @@ class BlueforsClient:
     @staticmethod
     def format_timedelta(td):
         s = td.total_seconds()
+
+        days = s//(3600*24)
+        if days >= 2:
+            return "%sd"%int(days)
+
         hours, remainder = divmod(s, 3600)
         minutes, seconds = divmod(remainder, 60)
         if hours > 0:
