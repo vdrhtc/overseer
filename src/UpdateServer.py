@@ -49,6 +49,8 @@ class UpdateServer:
         connection.send(slave_nickname.encode())
         self._logger.debug("Successful handshake with %s" % str(slave_nickname))
 
+        heartbeat_message_interval = 10
+        counter = 0
 
         while not self._stop:
             data = connection.recv(1024).decode()
@@ -57,8 +59,14 @@ class UpdateServer:
                 connection.close()
                 break
 
-            self._logger.debug("State update from %s of length %d" % (address[0], len(data)))
-            # print("State update from %s of length %d" % (address, len(data)))
+            if counter == heartbeat_message_interval:
+                counter = 0
+            elif counter == 0:
+                self._logger.debug("State update from %s of length %d" % (address[0], len(data)))
+                counter += 1
+            else:
+                counter += 1
+
             self._latest_states[slave_nickname] = data
 
     def get_latest_state(self, slave_nickname):

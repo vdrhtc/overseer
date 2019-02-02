@@ -9,6 +9,7 @@ from src.DBOperator import DBOperator
 from src.LoggingServer import LoggingServer
 from src.ResourseManager import ResourceManager
 
+from src.LoggingServer import LoggingServer
 
 class Overseer:
 
@@ -23,17 +24,16 @@ class Overseer:
 
         self._resource_manager = ResourceManager()
         self._lock = broadcaster.get_lock()
+        self._logger = LoggingServer.getInstance()
 
-        start_handler = CommandHandler('start', self.on_start)
-        scheme_handler = CommandHandler('scheme', self.on_scheme)
-        sub_handler = CommandHandler('subscribe', self.on_subscribe)
-        unsub_handler = CommandHandler('unsubscribe', self.on_unsubscribe)
-        callback_handler = CallbackQueryHandler(self.on_callback)
-        self._updater.dispatcher.add_handler(start_handler)
-        self._updater.dispatcher.add_handler(scheme_handler)
-        self._updater.dispatcher.add_handler(sub_handler)
-        self._updater.dispatcher.add_handler(unsub_handler)
-        self._updater.dispatcher.add_handler(callback_handler)
+        self._updater.dispatcher.add_handler(CommandHandler('start', self.on_start))
+        self._updater.dispatcher.add_handler(CommandHandler('help', self.on_help))
+        self._updater.dispatcher.add_handler(CommandHandler('scheme', self.on_scheme))
+        self._updater.dispatcher.add_handler(CommandHandler('checkout', self.on_checkout))
+        self._updater.dispatcher.add_handler(CommandHandler('subscribe', self.on_subscribe))
+        self._updater.dispatcher.add_handler(CommandHandler('unsubscribe', self.on_unsubscribe))
+        self._updater.dispatcher.add_handler(CallbackQueryHandler(self.on_callback))
+
 
         self._logger = LoggingServer.getInstance()
 
@@ -51,6 +51,10 @@ class Overseer:
     def on_start(self, bot, update):
         update.message.reply_text(self._resource_manager.get_string("greeting"))
 
+    def on_help(self, bot, update):
+        with open("resources/command_summary.html", "r") as f:
+            update.message.reply_text(f.read(), parse_mode="HTML")
+
     def on_scheme(self, bot, update):
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK", callback_data="OK")]])
         with open("scheme.PNG", 'rb') as f:
@@ -66,6 +70,8 @@ class Overseer:
 
         user_telegram_id = update.message.chat_id
 
+        self._logger.info("Subscribing user %d to slave %s" % (user_telegram_id, slave_nickname))
+
         self._db_operator.add_user(user_telegram_id)
         self._db_operator.add_slave(slave_nickname, None)
 
@@ -73,6 +79,18 @@ class Overseer:
                                                     .get_string("fetching_updates") % slave_nickname).message_id
 
         self._db_operator.subscribe(user_telegram_id, slave_nickname, info_message_id)
+
+    def on_checkout(self, bot, update):
+
+        slave_nickname = update.message.text[10:]
+        if slave_nickname == "":
+            update.message.reply_text(self._resource_manager.get_string("no_slave_nickname"))
+            return
+
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK", callback_data="OK")]])
+        update.message.reply_text(self._broadcaster.get_update_server().get_latest_state(slave_nickname),
+                                  parse_mode=ParseMode.MARKDOWN, reply_markup = reply_markup)
+
 
     def on_unsubscribe(self, bot, update):
         user_telegram_id = update.message.chat_id

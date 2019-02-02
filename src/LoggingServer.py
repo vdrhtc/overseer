@@ -38,6 +38,9 @@ class LoggingServer:
     def warn(self, *args):
         self._messageQueue.put(("warn", args))
 
+    def info(self, *args):
+        self._messageQueue.put(("info", args))
+
     def run(self):
         while True:
             msg = self._messageQueue.get()
@@ -45,3 +48,5 @@ class LoggingServer:
                 self.logger.debug(*msg[1])
             elif msg[0] == "warn":
                 self.logger.warning(*msg[1])
+            elif msg[0] == "info":
+                self.logger.info(*msg[1])

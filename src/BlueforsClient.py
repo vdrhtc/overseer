@@ -187,7 +187,7 @@ class BlueforsClient:
     @staticmethod
     def format_unicode_sci(number):
         try:
-            exponent = round(log10(number))
+            exponent = round(log10(abs(number)))
             if exponent < 0:
                 mantis = number / 10 ** exponent
 
