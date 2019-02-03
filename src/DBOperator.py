@@ -3,17 +3,27 @@ from datetime import datetime
 import psycopg2
 from psycopg2 import ProgrammingError, IntegrityError
 from psycopg2.extras import Inet
+from telegram import Message
 
 
 class DBOperator:
+    TABLES = ["users", "slaves", "subscriptions", "messages"]
 
-    def __init__(self, dbname, user, password):
+    def __init__(self, dbname, user, password, drop_key=""):
         self._dbname = dbname
         self._user = user
         self._password = password
 
         self._conn = psycopg2.connect("dbname=%s user=%s password=%s" % (dbname, user, password))
         self._c = self._conn.cursor()
+
+        if drop_key == "r4jYi1@" and dbname == "overseer_test":
+            for table in self.TABLES:
+                try:
+                    with self._conn:
+                        self._c.execute("DROP TABLE %s CASCADE;" % table)
+                except ProgrammingError as e:
+                    print(e)
 
         if len(self.get_tables()) == 0:
             self.create_tables()
@@ -26,7 +36,6 @@ class DBOperator:
                        ORDER BY table_schema,table_name;"""
             self._c.execute(query)
             return self._c.fetchall()
-
 
     def create_tables(self):
         with self._conn:
@@ -65,6 +74,20 @@ class DBOperator:
                     """
             self._c.execute(query)
 
+            query = """
+                    CREATE TABLE messages (
+                        user_telegram_id integer NOT NULL,
+                        message_id integer NOT NULL,
+                        user_full_name VARCHAR(250) NOT NULL,
+                        user_telegram_nick VARCHAR(250) NOT NULL,
+                        date timestamp without time zone,
+                        text VARCHAR(6000)
+
+                    );
+                    CREATE INDEX messages_idx ON messages (user_telegram_id, message_id);
+                    """
+            self._c.execute(query)
+
     def add_user(self, telegram_id: int):
         try:
             query = "INSERT INTO users (telegram_id) VALUES (%s);"
@@ -81,7 +104,6 @@ class DBOperator:
         except IntegrityError:
             self._conn.rollback()  # slave is already known
 
-
     def get_users(self):
         with self._conn:
             self._c.execute("select * from users")
@@ -90,19 +112,20 @@ class DBOperator:
     def get_slaves(self):
         with self._conn:
             self._c.execute("select * from slaves")
-            return self._c.fetchall()
+            return [datum[1] for datum in self._c.fetchall()]
 
     def get_subscriptions(self, telegram_id):
-        
-        user_id = self._get_user_id(telegram_id)
-        
+
         with self._conn:
-            query = """SELECT slave_nickname, info_message_id FROM slaves JOIN subscriptions USING (slave_id)  
-                        WHERE slave_id IN (
-                          SELECT slave_id FROM users JOIN subscriptions USING (user_id) 
-                             WHERE user_id=%s
-                          );"""
-            self._c.execute(query, [user_id])
+            query = """SELECT slave_nickname, info_message_id
+                          FROM slaves
+                        LEFT OUTER JOIN subscriptions
+                          ON slaves.slave_id = subscriptions.slave_id
+                        LEFT OUTER JOIN users
+                          ON users.user_id = subscriptions.user_id
+                        where telegram_id = %s;
+                    """
+            self._c.execute(query, [telegram_id])
             return self._c.fetchall()
 
     def subscribe(self, telegram_id, slave_nickname, info_message_id):
@@ -121,7 +144,6 @@ class DBOperator:
                 query = "UPDATE subscriptions SET info_message_id = %s, sub_date = %s WHERE user_id = %s AND slave_id = %s"
                 self._c.execute(query, [info_message_id, sub_date, user_id, slave_id])
 
-
     def unsubscribe(self, telegram_id, slave_nickname):
 
         user_id = self._get_user_id(telegram_id)
@@ -134,6 +156,29 @@ class DBOperator:
         except ProgrammingError as e:
             self._conn.rollback()
             raise ValueError("Delete error: %s" % str(e))
+
+    def add_message(self, message: Message):
+        user_telegram_id = message.from_user.id
+        message_id = message.message_id
+        user_full_name = message.from_user.full_name
+        user_telegram_nick = message.from_user.name
+        date = message.date
+        text = message.text
+
+        fields = [user_telegram_id, message_id, user_full_name,
+                  user_telegram_nick, date, text]
+
+        with self._conn:
+            query = "INSERT INTO messages (user_telegram_id, message_id, user_full_name, " \
+                    "                      user_telegram_nick, date, text) " \
+                    "VALUES (%s, %s, %s, %s, %s, %s);"
+            self._c.execute(query, fields)
+
+    def get_messages(self, telegram_id):
+        with self._conn:
+            query = "SELECT * from messages WHERE user_telegram_id = %s"
+            self._c.execute(query, [telegram_id])
+            return self._c.fetchall()
 
     def _get_user_id(self, telegram_id):
         try:

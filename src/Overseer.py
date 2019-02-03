@@ -1,15 +1,24 @@
 import subprocess
 
 from telegram import *
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
 from threading import Lock
 import pickle
 
 from src.DBOperator import DBOperator
 from src.LoggingServer import LoggingServer
-from src.ResourseManager import ResourceManager
+from src.ResourceManager import ResourceManager
 
 from src.LoggingServer import LoggingServer
+
+
+def record_message(callback):
+    def wrapper(*args):
+        self, bot, update = args
+        self._db_operator.add_message(update.message)
+        callback(*args)
+
+    return wrapper
 
 class Overseer:
 
@@ -23,7 +32,6 @@ class Overseer:
         self._updater = broadcaster.get_telegram_updater()
 
         self._resource_manager = ResourceManager()
-        self._lock = broadcaster.get_lock()
         self._logger = LoggingServer.getInstance()
 
         self._updater.dispatcher.add_handler(CommandHandler('start', self.on_start))
@@ -32,8 +40,8 @@ class Overseer:
         self._updater.dispatcher.add_handler(CommandHandler('checkout', self.on_checkout))
         self._updater.dispatcher.add_handler(CommandHandler('subscribe', self.on_subscribe))
         self._updater.dispatcher.add_handler(CommandHandler('unsubscribe', self.on_unsubscribe))
+        self._updater.dispatcher.add_handler(MessageHandler(Filters.text, callback=self.on_message))
         self._updater.dispatcher.add_handler(CallbackQueryHandler(self.on_callback))
-
 
         self._logger = LoggingServer.getInstance()
 
@@ -48,10 +56,16 @@ class Overseer:
     def stop_broadcaster(self):
         self._broadcaster.stop()
 
+    @record_message
     def on_start(self, bot, update):
+        self._log_user_action("/start", update.message.from_user)
+
         update.message.reply_text(self._resource_manager.get_string("greeting"))
 
+    @record_message
     def on_help(self, bot, update):
+        self._log_user_action("/help", update.message.from_user)
+
         with open("resources/command_summary.html", "r") as f:
             update.message.reply_text(f.read(), parse_mode="HTML")
 
@@ -61,7 +75,7 @@ class Overseer:
             self._updater.bot.send_photo(update.message.chat_id, f, reply_markup=reply_markup)
 
     def on_subscribe(self, bot, update):
-
+        self._log_user_action("/subscribe", update.message.from_user)
         slave_nickname = update.message.text[11:]
 
         if slave_nickname == "":
@@ -81,6 +95,7 @@ class Overseer:
         self._db_operator.subscribe(user_telegram_id, slave_nickname, info_message_id)
 
     def on_checkout(self, bot, update):
+        self._log_user_action("/checkout", update.message.from_user)
 
         slave_nickname = update.message.text[10:]
         if slave_nickname == "":
@@ -93,12 +108,16 @@ class Overseer:
 
 
     def on_unsubscribe(self, bot, update):
+        self._log_user_action("/unsubscribe", update.message.from_user)
+
         user_telegram_id = update.message.chat_id
         slave_nickname = update.message.text[13:]
 
         if slave_nickname == "":
             update.message.reply_text(self._resource_manager.get_string("no_slave_nickname"))
             return
+
+        self._logger.info("Unsubscribing user %d from slave %s" % (user_telegram_id, slave_nickname))
 
         self._db_operator.unsubscribe(user_telegram_id, slave_nickname)
         update.message.reply_text(self._resource_manager.get_string("unsubscribed") % slave_nickname)
@@ -108,9 +127,16 @@ class Overseer:
             self._updater.bot.deleteMessage(update.callback_query.message.chat_id,
                                             update.callback_query.message.message_id)
 
+    def on_message(self, bot, update):
+        self._log_user_action("A message was received", update.message.from_user)
+
     def _check_tor(self):
         p1 = subprocess.Popen(["wmic", "process", "get", "description"], stdout=subprocess.PIPE)
         proc_names = [proc_name.strip() for proc_name in p1.communicate()[0].decode().split("\r\r\n")]
         if "tor.exe" not in proc_names:
             p1 = subprocess.Popen('"C:\\Users\\labiks\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe"',
                                   stdout=subprocess.PIPE)
+
+    def _log_user_action(self, msg, user):
+        self._logger.debug("%s, user: %s, %d" % (msg, user.full_name, user.id))
+

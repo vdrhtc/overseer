@@ -191,8 +191,6 @@ class BlueforsClient:
         with open(logs_path + date + "/" + maxigauge_file, "r") as f:
             maxigauge = f.readlines()
 
-        maxigauge[0]
-
         for row in csv.reader(maxigauge):
             t = datetime.strptime(row[0] + " " + row[1], "%d-%m-%y %H:%M:%S")
             p_vals = [float(row[5 + i * 6]) for i in range(0, 6)]

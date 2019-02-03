@@ -23,7 +23,7 @@ class UpdateServer:
         self._socket = socket.socket()
         self._socket.bind((self._host, self._port))
         self._socket.listen()
-        self._logger.debug("UpdateServer: listening on %s" % str((self._host, self._port)))
+        self._logger.info("UpdateServer: listening on %s" % str((self._host, self._port)))
 
         connection_dispatcher = Thread(target=self._dispatch_connections)
         connection_dispatcher.setDaemon(True)
@@ -35,7 +35,7 @@ class UpdateServer:
     def _dispatch_connections(self):
         while not self._stop:
             conn, address = self._socket.accept()  # accept new connection
-            self._logger.debug("Connection from: " + str(address))
+            self._logger.info("Connection from: " + str(address))
             # print("Connection from: " + str(address))
 
             communicator = Thread(target=self._communicate, args=[conn, address])

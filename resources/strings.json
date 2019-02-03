@@ -2,5 +2,6 @@
   "greeting": "Greetings, Master! I shall aid you to shepherd your flock.\nYoy may find it of use to ask for /help and see what my powers are...",
   "no_slave_nickname":"You need to provide the slave's nickname like this:\n/subscribe slave1",
   "fetching_updates":"Getting updates for %s...",
-  "unsubscribed": "You were unsubscribed from %s"
+  "unsubscribed": "You were unsubscribed from %s",
+  "autounsubscribe": "Sorry, Master, I had to unsubscribe you from %s: I've lost the info message! Would you subscribe again?"
 }

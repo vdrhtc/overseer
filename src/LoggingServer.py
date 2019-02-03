@@ -8,26 +8,33 @@ from logging.handlers import TimedRotatingFileHandler
 
 
 class LoggingServer:
-    try:
-        loggingHandler = TimedRotatingFileHandler(
-            'log/overseer.log', when="midnight", backupCount=1)
-    except FileNotFoundError:
-        os.mkdir("log")
-        loggingHandler = TimedRotatingFileHandler(
-            'log/overseer.log', when="midnight", backupCount=1)
-
-    loggingFormat = '%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s'
-    loggingFormatter = Formatter(fmt=loggingFormat, datefmt='%I:%M:%S')
-    loggingHandler.setFormatter(loggingFormatter)
-    logger = logging.getLogger('overseer')
-    logger.setLevel("DEBUG")
-    logger.addHandler(loggingHandler)
 
     INSTANCE = None
+    logger = logging.getLogger('overseer')
 
     @staticmethod
-    def getInstance():
+    def getInstance(test = False):
         if LoggingServer.INSTANCE is None:
+            try:
+                os.mkdir("log")
+            except FileExistsError:
+                pass
+            finally:
+                file_name = 'log/overseer.log' if not test else 'log/overseer_test.log'
+                logging_handler = TimedRotatingFileHandler(
+                    file_name, when="midnight", backupCount=1)
+
+            if not test:
+                logging_format = '%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s'
+            else:
+                logging_format = 'TESTING %(asctime)s.%(msecs)03d [%(levelname)s] %(message)s'
+
+            logging_formatter = Formatter(fmt=logging_format, datefmt='%I:%M:%S')
+            logging_handler.setFormatter(logging_formatter)
+
+            LoggingServer.logger.setLevel("DEBUG")
+            LoggingServer.logger.addHandler(logging_handler)
+
             LoggingServer.INSTANCE = LoggingServer()
             return LoggingServer.INSTANCE
         else:
