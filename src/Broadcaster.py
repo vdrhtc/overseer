@@ -40,7 +40,7 @@ class Broadcaster:
         self._update_server.launch()
 
         self._stop = False
-        t = Thread(target=self._broadcast_updates)
+        t = Thread(target=self._run)
         t.setDaemon(True)
         t.start()
 
@@ -51,27 +51,32 @@ class Broadcaster:
     def get_update_server(self):
         return self._update_server
 
-    def _broadcast_updates(self):
+    def _run(self):
         self._running = True
         while not self._stop:
-            users = self._db_operator.get_users()
-            for user in users:
-
-                subscriptions = self._db_operator.get_subscriptions(user)
-                print("\rSubs:", len(subscriptions), ", updating", user, end="", flush=True)
-
-                for subscription in subscriptions:
-                    slave_nickname, info_message_id = subscription
-                    message = self._update_server.get_latest_state(slave_nickname)
-                    try:
-                        self._telegram_updater.bot.edit_message_text(message, user, info_message_id,
-                                                                     parse_mode=ParseMode.MARKDOWN)
-                    except BadRequest as e:
-                        self._logger.warn("Error for user %d, %s: " % (user, slave_nickname) + str(e))
-                    except TimedOut as e:
-                        self._logger.warn("Timed out updating %d, %s: " % (user, slave_nickname) + str(e))
-                    except NetworkError as e:
-                        self._logger.warn("Network error %d, %s: " % (user, slave_nickname) + str(e))
-
+            self._broadcast_updates()
             sleep(15)
         self._running = False
+
+    def _broadcast_updates(self):
+        users = self._db_operator.get_users()
+        for user in users:
+            for sub in self._db_operator.get_subscriptions(user.telegram_id):
+                print("\rUpdating %s, slave: %s" % (str(user), str(sub[0])),
+                      end=" " * 10, flush=True)
+                self._send_update(user, sub)
+
+    def _send_update(self, user, subscription):
+        slave_nickname, info_message_id = subscription
+        message = self._update_server.get_latest_state(slave_nickname)
+        try:
+            self._telegram_updater.bot.edit_message_text(message,
+                                                         user.telegram_id,
+                                                         info_message_id,
+                                                         parse_mode=ParseMode.MARKDOWN)
+        except BadRequest as e:
+            self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
+        except TimedOut as e:
+            self._logger.warn("Timed out updating %d, %s" % (user.telegram_id, slave_nickname))
+        except NetworkError as e:
+            self._logger.warn("Network error %d, %s: " % (user.telegram_id, slave_nickname) + str(e))

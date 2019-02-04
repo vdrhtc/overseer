@@ -1,4 +1,5 @@
 import subprocess
+from collections import namedtuple
 
 from telegram import *
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
@@ -10,6 +11,7 @@ from src.LoggingServer import LoggingServer
 from src.ResourceManager import ResourceManager
 
 from src.LoggingServer import LoggingServer
+from test.UserMock import UserMock
 
 
 def record_message(callback):
@@ -19,6 +21,7 @@ def record_message(callback):
         callback(*args)
 
     return wrapper
+
 
 class Overseer:
 
@@ -69,11 +72,13 @@ class Overseer:
         with open("resources/command_summary.html", "r") as f:
             update.message.reply_text(f.read(), parse_mode="HTML")
 
+    @record_message
     def on_scheme(self, bot, update):
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK", callback_data="OK")]])
         with open("scheme.PNG", 'rb') as f:
             self._updater.bot.send_photo(update.message.chat_id, f, reply_markup=reply_markup)
 
+    @record_message
     def on_subscribe(self, bot, update):
         self._log_user_action("/subscribe", update.message.from_user)
         slave_nickname = update.message.text[11:]
@@ -86,14 +91,16 @@ class Overseer:
 
         self._logger.info("Subscribing user %d to slave %s" % (user_telegram_id, slave_nickname))
 
-        self._db_operator.add_user(user_telegram_id)
-        self._db_operator.add_slave(slave_nickname, None)
+        self._db_operator.add_user(update.message.from_user)
+        Slave = namedtuple("Slave", "nickname ip")
+        self._db_operator.add_slave(Slave(slave_nickname, None))
 
         info_message_id = update.message.reply_text(self._resource_manager
                                                     .get_string("fetching_updates") % slave_nickname).message_id
 
         self._db_operator.subscribe(user_telegram_id, slave_nickname, info_message_id)
 
+    @record_message
     def on_checkout(self, bot, update):
         self._log_user_action("/checkout", update.message.from_user)
 
@@ -104,9 +111,9 @@ class Overseer:
 
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK", callback_data="OK")]])
         update.message.reply_text(self._broadcaster.get_update_server().get_latest_state(slave_nickname),
-                                  parse_mode=ParseMode.MARKDOWN, reply_markup = reply_markup)
+                                  parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
-
+    @record_message
     def on_unsubscribe(self, bot, update):
         self._log_user_action("/unsubscribe", update.message.from_user)
 
@@ -127,6 +134,7 @@ class Overseer:
             self._updater.bot.deleteMessage(update.callback_query.message.chat_id,
                                             update.callback_query.message.message_id)
 
+    @record_message
     def on_message(self, bot, update):
         self._log_user_action("A message was received", update.message.from_user)
 
@@ -139,4 +147,3 @@ class Overseer:
 
     def _log_user_action(self, msg, user):
         self._logger.debug("%s, user: %s, %d" % (msg, user.full_name, user.id))
-

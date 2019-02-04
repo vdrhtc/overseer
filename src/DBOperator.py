@@ -4,6 +4,7 @@ import psycopg2
 from psycopg2 import ProgrammingError, IntegrityError
 from psycopg2.extras import Inet
 from telegram import Message
+from collections import namedtuple
 
 
 class DBOperator:
@@ -42,7 +43,9 @@ class DBOperator:
             query = """
                     CREATE TABLE users (
                         user_id serial PRIMARY KEY,
-                        telegram_id integer UNIQUE NOT NULL
+                        telegram_id integer UNIQUE NOT NULL,
+                        full_name VARCHAR(50),
+                        nickname VARCHAR(50)
                     );
                     """
             self._c.execute(query)
@@ -88,31 +91,53 @@ class DBOperator:
                     """
             self._c.execute(query)
 
-    def add_user(self, telegram_id: int):
+    def add_user(self, user):
+        telegram_id = user.id
+        full_name = user.full_name
+        nickname = user.name
         try:
-            query = "INSERT INTO users (telegram_id) VALUES (%s);"
-            self._c.execute(query, [telegram_id])
+            query = "INSERT INTO users (telegram_id, full_name, nickname) VALUES (%s, %s, %s);"
+            self._c.execute(query, [telegram_id, full_name, nickname])
             self._conn.commit()
         except IntegrityError:
             self._conn.rollback()  # user is already known
+            query = "UPDATE users SET (full_name, nickname) = (%s, %s) WHERE telegram_id = %s;"
+            self._c.execute(query, [full_name, nickname, telegram_id])
+            self._conn.commit()
 
-    def add_slave(self, nickname, ip):
+
+
+    def add_slave(self, slave):
+        slave_nickname = slave.nickname
+        slave_ip = slave.ip
         try:
             query = "INSERT INTO slaves (slave_nickname, slave_ip) VALUES (%s, %s);"
-            self._c.execute(query, [nickname, Inet(ip)])
+            self._c.execute(query, [slave_nickname, Inet(slave_ip)])
             self._conn.commit()
         except IntegrityError:
             self._conn.rollback()  # slave is already known
 
     def get_users(self):
+        fields = "telegram_id", "full_name", "nickname"
         with self._conn:
-            self._c.execute("select * from users")
-            return [datum[1] for datum in self._c.fetchall()]
+            self._c.execute("select %s from users" % ", ".join(fields))
+            raw_users = self._c.fetchall()
+            users = []
+            for raw_user in raw_users:
+                User = namedtuple("User", fields)
+                users.append(User(*raw_user))
+            return users
 
     def get_slaves(self):
         with self._conn:
-            self._c.execute("select * from slaves")
-            return [datum[1] for datum in self._c.fetchall()]
+            fields = "slave_nickname", "slave_ip"
+            self._c.execute("select %s from slaves" % ", ".join(fields))
+            raw_slaves = self._c.fetchall()
+            slaves = []
+            for raw_slave in raw_slaves:
+                Slave = namedtuple("Slave", fields)
+                slaves.append(Slave(*raw_slave))
+            return slaves
 
     def get_subscriptions(self, telegram_id):
 

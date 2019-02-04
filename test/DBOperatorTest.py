@@ -5,6 +5,8 @@ import psycopg2
 
 from src.DBOperator import *
 from test.MessageMock import MessageMock
+from test.SlaveMock import SlaveMock
+from test.UserMock import UserMock
 
 
 class DBOperatorTest(unittest.TestCase):
@@ -17,72 +19,87 @@ class DBOperatorTest(unittest.TestCase):
         self._sut = DBOperator("overseer_test", "inlatexbot", "inlatexbot", drop_key="r4jYi1@")
 
     def testAddUser(self):
+        user = UserMock()
+        self._sut.add_user(user)
 
-        telegram_id = 123459
+        users = self._sut.get_users()
 
-        self._sut.add_user(telegram_id)
+        self.assertIn((user.id, user.full_name, user.name), users)
 
-        telegram_ids = self._sut.get_users()
+        user1 = UserMock(135)
 
-        self.assertTrue(123459 in telegram_ids)
+        # testing update
+        with self._conn:
+            c = self._conn.cursor()
+            c.execute("INSERT INTO users (telegram_id) VALUES (%s)", [user1.id])
+
+        self._sut.add_user(user1)
+
+        users = self._sut.get_users()
+        self.assertIn((user1.id, user1.full_name, user1.name), users)
+
+
+
 
     def testAddUserTwoTimes(self):
 
-        telegram_id = 123459
+        user = UserMock()
 
-        self._sut.add_user(telegram_id)
-        self._sut.add_user(telegram_id)
+        self._sut.add_user(user)
+        self._sut.add_user(user)
 
-        telegram_ids = self._sut.get_users()
+        users = self._sut.get_users()
 
-        self.assertEqual(len(telegram_ids), 1)
-        self.assertTrue(telegram_id in telegram_ids)
+        self.assertEqual(len(users), 1)
+        self.assertIn((user.id, user.full_name, user.name), users)
 
     def testAddSlave(self):
 
-        slave_nickname = "slave1"
+        slave1 = SlaveMock()
+        slave2 = SlaveMock("slave2")
 
-        self._sut.add_slave(slave_nickname, "0.0.0.0")
+        self._sut.add_slave(slave1)
+        self._sut.add_slave(slave2)
 
-        slave_nicknames = self._sut.get_slaves()
+        slaves = self._sut.get_slaves()
 
-        self.assertTrue(slave_nickname in slave_nicknames)
+        self.assertListEqual([slave1.to_tuple(), slave2.to_tuple()], slaves)
 
     def testAddSlaveTwoTimes(self):
 
-        slave_nickname = "slave1"
+        slave = SlaveMock()
 
-        self._sut.add_slave(slave_nickname, "0.0.0.0")
-        self._sut.add_slave(slave_nickname, "0.0.0.0")
+        self._sut.add_slave(slave)
+        self._sut.add_slave(slave)
 
-        slave_nicknames = self._sut.get_slaves()
+        slaves = self._sut.get_slaves()
 
-        self.assertEqual(len(slave_nicknames), 1)
-        self.assertTrue(slave_nickname in slave_nicknames)
+        self.assertListEqual([slave.to_tuple()], slaves)
 
     def testSubscribe(self):
 
         telegram_id = 123459
-        self._sut.add_user(telegram_id)
-        self._sut.add_slave("slave1", "0.0.0.0")
-        self._sut.add_slave("slave2", "0.0.0.0")
+        self._sut.add_user(UserMock(telegram_id=telegram_id))
+        self._sut.add_slave(SlaveMock())
+        self._sut.add_slave(SlaveMock("slave2"))
 
         self._sut.subscribe(telegram_id, "slave1", 11)
         self._sut.subscribe(telegram_id, "slave2", 12)
 
-        slaves = self._sut.get_subscriptions(telegram_id)
+        subs = self._sut.get_subscriptions(telegram_id)
 
-        self.assertListEqual(slaves, [("slave1", 11), ("slave2", 12)])
+        self.assertListEqual(subs, [("slave1", 11), ("slave2", 12)])
 
     def testIncorrectSubscribe(self):
 
         telegram_id = 123459
+        user = UserMock(telegram_id=telegram_id)
         try:
             self._sut.subscribe(telegram_id, "slave1", 11)
         except ValueError as e:
             self.assertEqual(e.args[0], "User %d not found" % telegram_id)
 
-        self._sut.add_user(telegram_id)
+        self._sut.add_user(user)
 
         try:
             self._sut.subscribe(telegram_id, "slave1", 11)
@@ -93,37 +110,40 @@ class DBOperatorTest(unittest.TestCase):
         # double subscribe
         telegram_id = 123459
 
-        self._sut.add_user(telegram_id)
-        self._sut.add_slave("slave1", "0.0.0.0")
+        self._sut.add_user(UserMock(telegram_id=telegram_id))
+        self._sut.add_slave(SlaveMock())
+
         self._sut.subscribe(telegram_id, "slave1", 11)
 
-        slaves = self._sut.get_subscriptions(telegram_id)
-        self.assertListEqual(slaves, [("slave1", 11)])
+        subs = self._sut.get_subscriptions(telegram_id)
+        self.assertListEqual(subs, [("slave1", 11)])
 
         self._sut.subscribe(telegram_id, "slave1", 12)
-        slaves = self._sut.get_subscriptions(telegram_id)
-        self.assertListEqual(slaves, [("slave1", 12)])
+        subs = self._sut.get_subscriptions(telegram_id)
+        self.assertListEqual(subs, [("slave1", 12)])
 
     def testUnsubscribe(self):
 
         telegram_id = 123459
-        self._sut.add_user(telegram_id)
-        self._sut.add_slave("slave1", "0.0.0.0")
-        self._sut.add_slave("slave2", "0.0.0.0")
+        user = UserMock(telegram_id=telegram_id)
+
+        self._sut.add_user(user)
+        self._sut.add_slave(SlaveMock())
+        self._sut.add_slave(SlaveMock("slave2"))
 
         self._sut.subscribe(telegram_id, "slave1", 11)
         self._sut.subscribe(telegram_id, "slave2", 12)
 
-        slaves = self._sut.get_subscriptions(telegram_id)
+        subs = self._sut.get_subscriptions(telegram_id)
 
-        self.assertListEqual(slaves, [("slave1", 11), ("slave2", 12)])
+        self.assertListEqual(subs, [("slave1", 11), ("slave2", 12)])
 
         self._sut.unsubscribe(telegram_id, "slave1")
         self._sut.unsubscribe(telegram_id, "slave2")
 
-        slaves = self._sut.get_subscriptions(telegram_id)
+        subs = self._sut.get_subscriptions(telegram_id)
 
-        self.assertListEqual(slaves, [])
+        self.assertListEqual(subs, [])
 
         with self.assertRaises(ValueError):
             self._sut.unsubscribe(telegram_id, "slave2123123")  # no such slave
@@ -132,11 +152,15 @@ class DBOperatorTest(unittest.TestCase):
             self._sut.unsubscribe(11, "slave2")  # no such user
 
     def testGetSubscribers(self):
+        user1 = UserMock()
+        user2 = UserMock(123460, full_name="Joe Marti", nickname="@pidr")
+        slave1 = SlaveMock()
+        slave2 = SlaveMock("slave2")
 
-        self._sut.add_user(123459)
-        self._sut.add_user(123460)
-        self._sut.add_slave("slave1", "0.0.0.0")
-        self._sut.add_slave("slave2", "0.0.0.0")
+        self._sut.add_user(user1)
+        self._sut.add_user(user2)
+        self._sut.add_slave(slave1)
+        self._sut.add_slave(slave2)
 
         def info_message_ids():
             for i in range(4):
@@ -144,16 +168,12 @@ class DBOperatorTest(unittest.TestCase):
 
         gen = info_message_ids()
         for user in self._sut.get_users():
-            for slave_nickname in self._sut.get_slaves():
-                u, s, m = user, slave_nickname, next(gen)
-                # print(u,s,m)
-                self._sut.subscribe(u, s, m)
+            for slave in self._sut.get_slaves():
+                uid, snick, m = user.telegram_id, slave.slave_nickname, next(gen)
+                self._sut.subscribe(uid, snick, m)
 
-        # self.assertTrue(False)
-        #
-        #
-        self.assertListEqual(self._sut.get_subscriptions(123459), [("slave1", 1), ("slave2", 2)])
-        self.assertListEqual(self._sut.get_subscriptions(123460), [("slave1", 3), ("slave2", 4)])
+        self.assertListEqual(self._sut.get_subscriptions(user1.id), [(slave1.nickname, 1), (slave2.nickname, 2)])
+        self.assertListEqual(self._sut.get_subscriptions(user2.id), [(slave1.nickname, 3), (slave2.nickname, 4)])
 
     def testAddMessage(self):
 

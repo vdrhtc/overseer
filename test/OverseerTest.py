@@ -6,6 +6,7 @@ from psycopg2 import ProgrammingError
 
 from src.Overseer import *
 from test.MessageMock import MessageMock
+from test.SlaveMock import SlaveMock
 
 
 class OverseerTest(unittest.TestCase):
@@ -67,8 +68,8 @@ class OverseerTest(unittest.TestCase):
     def testOnUnsubscribe(self):
         telegram_id = 123456
 
-        self._db_operator.add_user(telegram_id)
-        self._db_operator.add_slave("slave1", "0.0.0.0")
+        self._db_operator.add_user(UserMock(telegram_id))
+        self._db_operator.add_slave(SlaveMock())
         self._db_operator.subscribe(telegram_id, "slave1", 11)
 
         message = MessageMock(telegram_id,

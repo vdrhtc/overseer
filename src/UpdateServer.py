@@ -55,14 +55,14 @@ class UpdateServer:
         while not self._stop:
             data = connection.recv(1024).decode()
             if not data:
-                self._logger.debug("Emtpy data from %s, closing" % str(address))
+                self._logger.debug("Emtpy data from %s, closing" % str(slave_nickname))
                 connection.close()
                 break
 
             if counter == heartbeat_message_interval:
                 counter = 0
             elif counter == 0:
-                self._logger.debug("State update from %s of length %d" % (address[0], len(data)))
+                self._logger.debug("State update from %s of length %d" % (slave_nickname+" ("+address[0]+")", len(data)))
                 counter += 1
             else:
                 counter += 1
