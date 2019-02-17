@@ -63,7 +63,7 @@ class BlueforsClient:
             self._current_strategy = "reconnect"
 
     def _reconnect(self):
-        print("Reconnecting...")
+        print("\rReconnecting...")
         try:
             self._socket.close()
             self._socket = socket.socket()
