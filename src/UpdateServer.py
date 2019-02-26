@@ -3,12 +3,14 @@ from queue import Queue
 from threading import Thread, Lock
 
 from src.LoggingServer import LoggingServer
+from src.ResourceManager import ResourceManager
 
 
 class UpdateServer:
 
     def __init__(self):
 
+        self._rm = ResourceManager()
         self._host = "0.0.0.0"
         self._port = 5000  # initiate port no above 1024
         self._stop = False
@@ -73,4 +75,4 @@ class UpdateServer:
         try:
             return self._latest_states[slave_nickname]
         except KeyError:
-            return "Slave %s has not yet connected!" % slave_nickname
+            return self._rm.get_string("slave_not_connected") % slave_nickname

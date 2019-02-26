@@ -3,5 +3,6 @@
   "no_slave_nickname":"You need to provide the slave's nickname like this:\n/subscribe slave1",
   "fetching_updates":"Getting updates for %s...",
   "unsubscribed": "You were unsubscribed from %s",
-  "autounsubscribe": "Sorry, Master, I had to unsubscribe you from %s: I've lost the info message! Would you subscribe again?"
+  "autounsubscribe": "Sorry, Master, I had to unsubscribe you from %s: I've lost the info message! Would you subscribe again?",
+  "slave_not_connected": "Slave %s has not yet connected!"
 }
