@@ -41,21 +41,29 @@ class BlueforsClient:
         while not self._stop:
             try:
                 self._strategies[self._current_strategy]()
-            except Exception as e:
+            except TimeoutError as e:
                 self._logger.warn(str(e))
+                sleep(15)
                 self._current_strategy = "reconnect"
+            #except Exception as e:
+            #    self._logger.warn(str(e))
+            #    self._current_strategy = "reconnect"
         self._socket.close()
 
     def _send_update(self):
         print("\rSending update, " + str(datetime.now()), end="")
         try:
-            self._socket.send(self.generate_info_message().encode())
+            data = self.generate_info_message().encode()
+        except Exception as e:
+            data = str(e).encode()
+        try:
+            self._socket.send(data)
             sleep(15)
         except ConnectionResetError:
             self._current_strategy = "reconnect"
 
     def _reconnect(self):
-        print("Reconnecting...")
+        print("\rReconnecting...")
         try:
             self._socket.close()
             self._socket = socket.socket()
