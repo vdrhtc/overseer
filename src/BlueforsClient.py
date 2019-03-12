@@ -69,7 +69,7 @@ class BlueforsClient:
         try:
             self._secure_socket.send(data)
             sleep(15)
-        except ConnectionResetError:
+        except (ConnectionResetError, ConnectionAbortedError, ConnectionError):
             self._current_strategy = "reconnect"
 
     def _reconnect(self):
