@@ -45,9 +45,9 @@ class BlueforsClient:
                 self._logger.warn(str(e))
                 sleep(15)
                 self._current_strategy = "reconnect"
-            #except Exception as e:
-            #    self._logger.warn(str(e))
-            #    self._current_strategy = "reconnect"
+            except Exception as e:
+                self._logger.warn(str(e))
+                break
         self._socket.close()
 
     def _send_update(self):
@@ -63,7 +63,7 @@ class BlueforsClient:
             self._current_strategy = "reconnect"
 
     def _reconnect(self):
-        print("\rReconnecting...")
+        print("\rReconnecting...", end="")
         try:
             self._socket.close()
             self._socket = socket.socket()
