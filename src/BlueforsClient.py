@@ -2,9 +2,11 @@ import csv
 import os
 import re
 import socket
+import urllib
 from datetime import datetime
 from threading import Thread
 from time import sleep
+import ssl
 
 from numpy import reshape, log10
 
@@ -21,8 +23,15 @@ class BlueforsClient:
         self._nickname = nickname
         self._logger = LoggingServer.getInstance()
 
-        self._socket = socket.socket()  # instantiate
-        self._socket.connect((server_address, server_port))  # connect to the server
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        context.verify_mode = ssl.CERT_REQUIRED
+        certurl = "https://raw.githubusercontent.com/vdrhtc/overseer/master/domain.crt"
+        certfile = urllib.request.urlretrieve(certurl)[0]
+        context.load_verify_locations(certfile)
+
+        self._secure_socket = context.wrap_socket(socket.socket())  # instantiate
+
+        self._secure_socket.connect((server_address, server_port))  # connect to the server
 
         self._stop = False
         self._updater = Thread(target=self._act)
