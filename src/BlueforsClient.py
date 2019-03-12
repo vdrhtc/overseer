@@ -23,13 +23,13 @@ class BlueforsClient:
         self._nickname = nickname
         self._logger = LoggingServer.getInstance()
 
-        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        context.verify_mode = ssl.CERT_REQUIRED
+        self._context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        self._context.verify_mode = ssl.CERT_REQUIRED
         certurl = "https://raw.githubusercontent.com/vdrhtc/overseer/master/domain.crt"
-        certfile = urllib.request.urlretrieve(certurl)[0]
-        context.load_verify_locations(certfile)
+        self._certfile = urllib.request.urlretrieve(certurl)[0]
+        self._context.load_verify_locations(self._certfile)
 
-        self._secure_socket = context.wrap_socket(socket.socket())  # instantiate
+        self._secure_socket = self._context.wrap_socket(socket.socket())  # instantiate
 
         self._secure_socket.connect((server_address, server_port))  # connect to the server
 
@@ -56,6 +56,7 @@ class BlueforsClient:
                 self._current_strategy = "reconnect"
             except Exception as e:
                 self._logger.warn(str(e))
+                print(e)
                 break
         self._secure_socket.close()
 
@@ -66,7 +67,7 @@ class BlueforsClient:
         except Exception as e:
             data = str(e).encode()
         try:
-            self._socket.send(data)
+            self._secure_socket.send(data)
             sleep(15)
         except ConnectionResetError:
             self._current_strategy = "reconnect"
@@ -74,16 +75,16 @@ class BlueforsClient:
     def _reconnect(self):
         print("\rReconnecting...", end="")
         try:
-            self._socket.close()
-            self._socket = socket.socket()
-            self._socket.connect((self._server_address, self._server_port))  # connect to the server
+            self._secure_socket.close()
+            self._secure_socket = self._context.wrap_socket(socket.socket())
+            self._secure_socket.connect((self._server_address, self._server_port))  # connect to the server
             self._current_strategy = "handshake"
         except ConnectionRefusedError:
             sleep(15)
 
     def _handshake(self):
-        self._socket.send(self._nickname.encode())
-        response = self._socket.recv(1024).decode()
+        self._secure_socket.send(self._nickname.encode())
+        response = self._secure_socket.recv(1024).decode()
         if response == self._nickname:
             self._current_strategy = "update"
             print("Successful handshake!")
