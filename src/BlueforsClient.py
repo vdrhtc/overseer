@@ -57,7 +57,7 @@ class BlueforsClient:
             except Exception as e:
                 self._logger.warn(str(e))
                 break
-        self._socket.close()
+        self._secure_socket.close()
 
     def _send_update(self):
         print("\rSending update, " + str(datetime.now()), end="")

@@ -55,7 +55,7 @@ class UpdateServer:
 
     def _dispatch_secure_connections(self):
         while not self._stop:
-            conn, address = self._socket.accept()  # accept new connection
+            conn, address = self._secure_socket.accept()  # accept new connection
             self._logger.info("Secure connection from: " + str(address))
             # print("Connection from: " + str(address))
 
@@ -64,7 +64,7 @@ class UpdateServer:
             communicator = Thread(target=self._communicate, args=[connstream, address])
             communicator.setDaemon(True)
             communicator.start()
-        self._socket.close()
+        self._secure_socket.close()
 
     # def _dispatch_connections(self):
     #     while not self._stop:
