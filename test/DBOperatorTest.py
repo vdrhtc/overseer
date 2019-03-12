@@ -18,6 +18,22 @@ class DBOperatorTest(unittest.TestCase):
 
         self._sut = DBOperator("overseer_test", "inlatexbot", "inlatexbot", drop_key="r4jYi1@")
 
+
+    def testDbIndependentConnections(self):
+
+        db_operator = DBOperator("overseer_test", "inlatexbot", "inlatexbot")
+        # db_operator = self._sut
+        try:
+            db_operator._c.execute("INVALID_TRANSACTION")
+        except ProgrammingError:
+            pass
+
+        user = UserMock()
+        self._sut.add_user(user)
+        users = self._sut.get_users()
+        self.assertIn((user.id, user.full_name, user.name), users)
+
+
     def testAddUser(self):
         user = UserMock()
         self._sut.add_user(user)
@@ -37,8 +53,6 @@ class DBOperatorTest(unittest.TestCase):
 
         users = self._sut.get_users()
         self.assertIn((user1.id, user1.full_name, user1.name), users)
-
-
 
 
     def testAddUserTwoTimes(self):

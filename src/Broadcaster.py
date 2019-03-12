@@ -69,13 +69,15 @@ class Broadcaster:
     def _send_update(self, user, subscription):
         slave_nickname, info_message_id = subscription
         message = self._update_server.get_latest_state(slave_nickname)
+
         try:
             self._telegram_updater.bot.edit_message_text(message,
                                                          user.telegram_id,
                                                          info_message_id,
                                                          parse_mode=ParseMode.MARKDOWN)
         except BadRequest as e:
-            self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
+            if message != self._resource_manager.get_string("slave_not_connected") % slave_nickname:
+                self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
         except TimedOut as e:
             self._logger.warn("Timed out updating %d, %s" % (user.telegram_id, slave_nickname))
         except NetworkError as e:
