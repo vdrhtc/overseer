@@ -32,15 +32,6 @@ class UpdateServer:
 
         self._stop = False
 
-        # self._socket = socket.socket()
-        # self._socket.bind((self._host, self._port))
-        # self._socket.listen()
-        # self._logger.info("UpdateServer: listening on %s" % str((self._host, self._port)))
-        #
-        # connection_dispatcher = Thread(target=self._dispatch_connections)
-        # connection_dispatcher.setDaemon(True)
-        # connection_dispatcher.start()
-
         self._secure_socket = socket.socket()
         self._secure_socket.bind((self._host, self._secure_port))
         self._secure_socket.listen()
@@ -65,17 +56,6 @@ class UpdateServer:
             communicator.setDaemon(True)
             communicator.start()
         self._secure_socket.close()
-
-    # def _dispatch_connections(self):
-    #     while not self._stop:
-    #         conn, address = self._socket.accept()  # accept new connection
-    #         self._logger.info("Connection from: " + str(address))
-    #         # print("Connection from: " + str(address))
-    #
-    #         communicator = Thread(target=self._communicate, args=[conn, address])
-    #         communicator.setDaemon(True)
-    #         communicator.start()
-    #     self._socket.close()
 
     def _communicate(self, connection: socket.socket, address):
 
