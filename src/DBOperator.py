@@ -2,9 +2,13 @@ from datetime import datetime
 
 import psycopg2
 from psycopg2 import ProgrammingError, IntegrityError
+from psycopg2._psycopg import DataError
 from psycopg2.extras import Inet
 from telegram import Message
 from collections import namedtuple
+from hashlib import md5
+
+from src.ResourceManager import ResourceManager
 
 
 class DBOperator:
@@ -28,6 +32,8 @@ class DBOperator:
 
         if len(self.get_tables()) == 0:
             self.create_tables()
+
+        self._rm = ResourceManager()
 
     def get_tables(self):
         with self._conn:
@@ -54,7 +60,9 @@ class DBOperator:
                     CREATE TABLE slaves (
                         slave_id serial PRIMARY KEY,
                         slave_nickname VARCHAR(50) UNIQUE NOT NULL,
-                        slave_ip inet
+                        slave_ip inet,
+                        slave_owner integer,
+                        slave_password VARCHAR(60)
                     );
                     """
             self._c.execute(query)
@@ -105,17 +113,46 @@ class DBOperator:
             self._c.execute(query, [full_name, nickname, telegram_id])
             self._conn.commit()
 
-
-
     def add_slave(self, slave):
         slave_nickname = slave.nickname
         slave_ip = slave.ip
+        slave_password = md5(slave.password.encode()).hexdigest()
+        slave_owner = slave.owner
         try:
-            query = "INSERT INTO slaves (slave_nickname, slave_ip) VALUES (%s, %s);"
-            self._c.execute(query, [slave_nickname, Inet(slave_ip)])
+            query = "INSERT INTO slaves (slave_nickname, slave_ip, slave_owner, slave_password) " \
+                    "VALUES (%s, %s, %s, %s);"
+            self._c.execute(query, [slave_nickname, Inet(slave_ip), slave_owner, slave_password])
             self._conn.commit()
         except IntegrityError:
-            self._conn.rollback()  # slave is already known
+            self._conn.rollback()
+            raise ValueError("Slave already exists")
+        except DataError as e:
+            self._conn.rollback()
+            if len(slave_nickname) > 50:
+                raise ValueError(self._rm.get_string("slave_name_too_long"))
+            else:
+                raise e
+
+    def update_slave(self, slave):
+        slave_nickname = slave.nickname
+        slave_ip = slave.ip
+        slave_password = md5(slave.password.encode()).hexdigest()
+        slave_owner = slave.owner
+
+        try:
+            query = "UPDATE slaves SET (slave_ip, slave_owner, slave_password) = (%s, %s, %s) " \
+                    "WHERE slave_nickname = %s;"
+            self._c.execute(query, [Inet(slave_ip), slave_owner, slave_password, slave_nickname])
+            self._conn.commit()
+        # except IntegrityError:
+        #     self._conn.rollback()
+        #     raise ValueError("Slave already exists")
+        except DataError as e:
+            self._conn.rollback()
+            if len(slave_nickname) > 50:
+                raise ValueError(self._rm.get_string("slave_name_too_long"))
+            else:
+                raise e
 
     def get_users(self):
         fields = "telegram_id", "full_name", "nickname"
@@ -130,7 +167,7 @@ class DBOperator:
 
     def get_slaves(self):
         with self._conn:
-            fields = "slave_nickname", "slave_ip"
+            fields = "slave_nickname", "slave_ip", "slave_owner", "slave_password"
             self._c.execute("select %s from slaves" % ", ".join(fields))
             raw_slaves = self._c.fetchall()
             slaves = []
@@ -156,7 +193,7 @@ class DBOperator:
     def subscribe(self, telegram_id, slave_nickname, info_message_id):
 
         user_id = self._get_user_id(telegram_id)
-        slave_id = self._get_slave_id(slave_nickname)
+        slave_id = self.get_slave_id(slave_nickname)
         sub_date = datetime.now()
 
         try:
@@ -172,7 +209,7 @@ class DBOperator:
     def unsubscribe(self, telegram_id, slave_nickname):
 
         user_id = self._get_user_id(telegram_id)
-        slave_id = self._get_slave_id(slave_nickname)
+        slave_id = self.get_slave_id(slave_nickname)
 
         try:
             query = "DELETE FROM subscriptions WHERE user_id=%s AND slave_id=%s;"
@@ -213,7 +250,7 @@ class DBOperator:
             self._conn.rollback()
             raise ValueError("User %d not found" % telegram_id)
 
-    def _get_slave_id(self, slave_nickname):
+    def get_slave_id(self, slave_nickname):
         try:
             self._c.execute("select slaves.slave_id from slaves where slaves.slave_nickname=%s", [slave_nickname])
             return self._c.fetchall()[0][0]

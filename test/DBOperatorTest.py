@@ -1,9 +1,12 @@
 import unittest
 from unittest.mock import Mock, MagicMock
-from time import sleep
 import psycopg2
+from psycopg2._psycopg import ProgrammingError
+from hashlib import md5
 
-from src.DBOperator import *
+
+from src.DBOperator import DBOperator
+from src.ResourceManager import ResourceManager
 from test.MessageMock import MessageMock
 from test.SlaveMock import SlaveMock
 from test.UserMock import UserMock
@@ -17,6 +20,8 @@ class DBOperatorTest(unittest.TestCase):
                                       % ("overseer_test", "inlatexbot", "inlatexbot"))
 
         self._sut = DBOperator("overseer_test", "inlatexbot", "inlatexbot", drop_key="r4jYi1@")
+
+        self._rm = ResourceManager()
 
 
     def testDbIndependentConnections(self):
@@ -32,7 +37,6 @@ class DBOperatorTest(unittest.TestCase):
         self._sut.add_user(user)
         users = self._sut.get_users()
         self.assertIn((user.id, user.full_name, user.name), users)
-
 
     def testAddUser(self):
         user = UserMock()
@@ -54,7 +58,6 @@ class DBOperatorTest(unittest.TestCase):
         users = self._sut.get_users()
         self.assertIn((user1.id, user1.full_name, user1.name), users)
 
-
     def testAddUserTwoTimes(self):
 
         user = UserMock()
@@ -70,25 +73,62 @@ class DBOperatorTest(unittest.TestCase):
     def testAddSlave(self):
 
         slave1 = SlaveMock()
-        slave2 = SlaveMock("slave2")
+        slave2 = SlaveMock("slave2", password="test2pass", owner=45678)
 
         self._sut.add_slave(slave1)
         self._sut.add_slave(slave2)
 
         slaves = self._sut.get_slaves()
 
+        slave1.password = md5(slave1.password.encode()).hexdigest()
+        slave2.password = md5(slave2.password.encode()).hexdigest()
+
         self.assertListEqual([slave1.to_tuple(), slave2.to_tuple()], slaves)
+
+        slave3 = SlaveMock("a"*60)  # long name
+
+        try:
+            self._sut.add_slave(slave3)
+        except ValueError as e:
+            self.assertEqual(e.args[0], self._rm.get_string("slave_name_too_long"))
+        else:
+            assert False
 
     def testAddSlaveTwoTimes(self):
 
         slave = SlaveMock()
 
         self._sut.add_slave(slave)
-        self._sut.add_slave(slave)
+
+        try:
+            self._sut.add_slave(slave)
+        except ValueError as e:
+            self.assertEqual(e.args[0], "Slave already exists")  # TODO:replace with rm
+        else:
+            assert False
 
         slaves = self._sut.get_slaves()
 
+        slave.password = md5(slave.password.encode()).hexdigest()
+
         self.assertListEqual([slave.to_tuple()], slaves)
+
+    def testUpdateSlave(self):
+
+        slave = SlaveMock()
+
+        self._sut.add_slave(slave)
+
+        slave.password = "11ge!"
+
+        self._sut.update_slave(slave)
+
+        slaves = self._sut.get_slaves()
+
+        slave.password = md5(slave.password.encode()).hexdigest()
+
+        self.assertListEqual([slave.to_tuple()], slaves)
+
 
     def testSubscribe(self):
 
