@@ -13,10 +13,11 @@ from src.ResourceManager import ResourceManager
 from src.LoggingServer import LoggingServer
 from enum import Enum, auto
 
-class SlaveRegistrationStages(Enum):
 
+class SlaveRegistrationStages(Enum):
     SLAVE_NAME = auto()
     SLAVE_PASS = auto()
+
 
 def record_message(callback):
     def wrapper(*args):
@@ -154,7 +155,6 @@ class Overseer:
     def on_register_slave(self, bot, update):
         self._slave_registration_conversations[update.message.from_user.id] = SlaveRegistrationStages.SLAVE_NAME
 
-
     @record_message
     def on_message(self, bot, update):
         self._log_user_action("A message was received", update.message.from_user)
@@ -164,11 +164,13 @@ class Overseer:
                 return  # update consumed
 
     def _filter_slave_registration(self, update):
-        convs = self._slave_registration_conversations
+        conversations = self._slave_registration_conversations
         user_id = update.message.from_user.id
-        if user_id in convs.keys():
-            convs[user_id] = self._slave_registration_functions[convs[user_id]](update)
-            if convs[user_id] is None:
+        if user_id in conversations.keys():
+            conversations[user_id] = self._slave_registration_functions[conversations[user_id]](update)
+            if conversations[user_id] is None:
+                self._log_user_action("New slave %s registered" % self._slave_registration_data[user_id],
+                                      update.message.from_user)
                 del self._slave_registration_data[user_id]
                 del self._slave_registration_conversations[user_id]
                 update.message.reply_text(self._resource_manager.get_string("slave_registered"))
@@ -189,7 +191,6 @@ class Overseer:
             return SlaveRegistrationStages.SLAVE_NAME
         else:
             return SlaveRegistrationStages.SLAVE_PASS
-
 
     def _register_slave_password(self, update):
         user_id = update.message.from_user.id

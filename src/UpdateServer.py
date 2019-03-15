@@ -1,5 +1,6 @@
 import socket
 import ssl
+from enum import Enum, auto
 
 from threading import Thread, Lock
 
@@ -7,9 +8,14 @@ from src.LoggingServer import LoggingServer
 from src.ResourceManager import ResourceManager
 
 
+class ServerState(Enum):
+    ACCEPT = auto()
+    DISPATCH = auto()
+
+
 class UpdateServer:
 
-    def __init__(self, private_key_passphrase):
+    def __init__(self, tls_context):
 
         self._rm = ResourceManager()
         self._host = "0.0.0.0"
@@ -19,14 +25,17 @@ class UpdateServer:
         self._socket = None
 
         self._secure_socket = None
-        self._tls_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self._tls_context.load_cert_chain(certfile="domain.crt",
-                                          keyfile="private.pem",
-                                          password=private_key_passphrase)
+        self._tls_context = tls_context
 
         self._logger = LoggingServer.getInstance()
 
         self._latest_states = {}
+
+        self._strategies = {ServerState.ACCEPT: self._accept_connection,
+                            ServerState.DISPATCH: self._dispatch_connection}
+        self._state = ServerState.ACCEPT
+
+        self._connection_to_dispatch = None
 
     def launch(self):
 
@@ -37,25 +46,41 @@ class UpdateServer:
         self._secure_socket.listen()
         self._logger.info("UpdateServer: secure listening on %s" % str((self._host, self._port)))
 
-        connection_dispatcher = Thread(target=self._dispatch_secure_connections)
+        connection_dispatcher = Thread(target=self._act)
         connection_dispatcher.setDaemon(True)
         connection_dispatcher.start()
 
     def stop(self):
         self._stop = True
 
-    def _dispatch_secure_connections(self):
-        while not self._stop:
-            conn, address = self._secure_socket.accept()  # accept new connection
-            self._logger.info("Secure connection from: " + str(address))
-            # print("Connection from: " + str(address))
+    def _act(self):
+        try:
+            while not self._stop:
+                self._strategies[self._state]()
+        except Exception as e:
+            self._logger.warn("UpdateServer is going down: " + str(e))
+        finally:
+            self._secure_socket.close()
 
+    def _accept_connection(self):
+        conn, address = self._secure_socket.accept()  # accept new connection
+        self._logger.info("Connection from: " + str(address))
+        try:
             connstream = self._tls_context.wrap_socket(conn, server_side=True)
+        except ssl.SSLError as e:
+            self._logger.warn("UpdateServer: " + str(e))
+            return
 
-            communicator = Thread(target=self._communicate, args=[connstream, address])
-            communicator.setDaemon(True)
-            communicator.start()
-        self._secure_socket.close()
+        self._connection_to_dispatch = (connstream, address)
+        self._state = ServerState.DISPATCH
+
+    def _dispatch_connection(self):
+        communicator = Thread(target=self._communicate,
+                              args=self._connection_to_dispatch)
+        communicator.setDaemon(True)
+        communicator.start()
+        self._connection_to_dispatch = None
+        self._state = ServerState.ACCEPT
 
     def _communicate(self, connection: socket.socket, address):
 
