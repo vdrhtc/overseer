@@ -1,8 +1,11 @@
+import datetime
+import time
 from random import shuffle, randint
 import unittest
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, MagicMock
 
 from telegram import ParseMode
+from telegram.ext import Updater, Dispatcher
 
 from src.Broadcaster import Broadcaster
 from src.DBOperator import DBOperator
@@ -56,6 +59,12 @@ class BroadcasterTest(unittest.TestCase):
                                         self._db_operator)
 
     def testBroadcastUpdates(self):
+
+        def wait(*args, **kwargs):
+            time.sleep(.1)
+
+        self._telegram_updater.bot.edit_message_text = Mock(side_effect = wait)
+
         self._sut._broadcast_updates()
 
         for user in self._users:
