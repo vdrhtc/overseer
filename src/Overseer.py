@@ -48,6 +48,8 @@ class Overseer:
         self._updater.dispatcher.add_handler(CommandHandler('checkout', self.on_checkout))
         self._updater.dispatcher.add_handler(CommandHandler('subscribe', self.on_subscribe))
         self._updater.dispatcher.add_handler(CommandHandler('unsubscribe', self.on_unsubscribe))
+        self._updater.dispatcher.add_handler(CommandHandler('register_slave', self.on_register_slave))
+
         self._updater.dispatcher.add_handler(MessageHandler(Filters.text, callback=self.on_message))
         self._updater.dispatcher.add_handler(CallbackQueryHandler(self.on_callback))
         self._message_filters = [self._filter_slave_registration]
@@ -101,7 +103,7 @@ class Overseer:
         user_telegram_id = update.message.chat_id
 
         try:
-            self._db_operator.get_slave_id(slave_nickname)
+            self._db_operator.get_slave(slave_nickname)
         except ValueError:
             update.message.reply_text(self._resource_manager.get_string("no_slave"))
             return
@@ -153,9 +155,10 @@ class Overseer:
 
     @record_message
     def on_register_slave(self, bot, update):
+        self._log_user_action("/register_slave", update.message.from_user)
         self._slave_registration_conversations[update.message.from_user.id] = SlaveRegistrationStages.SLAVE_NAME
+        update.message.reply_text(self._resource_manager.get_string("slave_registration_started"))
 
-    @record_message
     def on_message(self, bot, update):
         self._log_user_action("A message was received", update.message.from_user)
         for message_filter in self._message_filters:
@@ -186,7 +189,9 @@ class Overseer:
         try:
             Slave = namedtuple("Slave", "nickname ip owner password")
             self._db_operator.add_slave(Slave(slave_name, "0.0.0.0", update.message.from_user.id, ""))
+            update.message.reply_text(self._resource_manager.get_string("slave_registration_password"))
         except ValueError as e:
+            self._logger.debug("Slave name invalid: %s" % e.args[0])
             update.message.reply_text(e.args[0])
             return SlaveRegistrationStages.SLAVE_NAME
         else:
@@ -204,13 +209,6 @@ class Overseer:
         except ValueError as e:
             update.message.reply_text(e.args[0])
             return SlaveRegistrationStages.SLAVE_PASS
-
-    def _check_tor(self):
-        p1 = subprocess.Popen(["wmic", "process", "get", "description"], stdout=subprocess.PIPE)
-        proc_names = [proc_name.strip() for proc_name in p1.communicate()[0].decode().split("\r\r\n")]
-        if "tor.exe" not in proc_names:
-            p1 = subprocess.Popen('"C:\\Users\\labiks\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe"',
-                                  stdout=subprocess.PIPE)
 
     def _log_user_action(self, msg, user):
         self._logger.debug("%s, user: %s, %d" % (msg, user.full_name, user.id))

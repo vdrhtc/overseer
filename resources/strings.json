@@ -7,5 +7,8 @@
   "slave_not_connected": "Slave %s has not yet connected!",
   "no_slave": "There's no such slave yet!",
   "slave_name_too_long": "Slave name too long! Max 50 chars allowed",
-  "slave_registered": "Slave successfully registered"
+  "slave_registered": "Slave successfully registered",
+  "slave_registration_started": "Please, tell me the slave's nickname",
+  "slave_registration_password": "The nickname was chosen! Now, tell me the password for the slave."
+
 }
