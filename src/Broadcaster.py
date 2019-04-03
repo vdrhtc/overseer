@@ -89,7 +89,8 @@ class Broadcaster:
             return user, subscription, None
         except BadRequest as e:
             if message != self._resource_manager.get_string("slave_not_connected") % slave_nickname:
-                self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
+                if e.message != "Message is not modified" and e.message != "Network error":
+                    self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
             return user, subscription, e
         except TimedOut as e:
             self._logger.warn("Timed out updating %d, %s" % (user.telegram_id, slave_nickname))
