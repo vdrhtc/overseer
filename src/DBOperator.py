@@ -157,7 +157,7 @@ class DBOperator:
     def get_users(self):
         fields = "telegram_id", "full_name", "nickname"
         with self._conn:
-            self._c.execute("select %s from users" % ", ".join(fields))
+            self._c.execute("SELECT %s FROM users" % ", ".join(fields))
             raw_users = self._c.fetchall()
             users = []
             for raw_user in raw_users:
@@ -168,13 +168,24 @@ class DBOperator:
     def get_slaves(self):
         with self._conn:
             fields = "slave_nickname", "slave_ip", "slave_owner", "slave_password"
-            self._c.execute("select %s from slaves" % ", ".join(fields))
+            self._c.execute("SELECT %s FROM slaves" % ", ".join(fields))
             raw_slaves = self._c.fetchall()
             slaves = []
             for raw_slave in raw_slaves:
                 Slave = namedtuple("Slave", fields)
                 slaves.append(Slave(*raw_slave))
             return slaves
+
+    def get_slave(self, nickname):
+        with self._conn:
+            fields = "slave_nickname", "slave_ip", "slave_owner", "slave_password"
+            self._c.execute("SELECT %s FROM slaves WHERE slave_nickname = '%s';" % (", ".join(fields), nickname))
+            try:
+                raw_slave = self._c.fetchall()[0]
+                Slave = namedtuple("Slave", fields)
+                return Slave(*raw_slave)
+            except IndexError:
+                raise ValueError("Slave %s not found" % nickname)
 
     def get_subscriptions(self, telegram_id):
 
@@ -193,7 +204,7 @@ class DBOperator:
     def subscribe(self, telegram_id, slave_nickname, info_message_id):
 
         user_id = self._get_user_id(telegram_id)
-        slave_id = self.get_slave_id(slave_nickname)
+        slave_id = self._get_slave_id(slave_nickname)
         sub_date = datetime.now()
 
         try:
@@ -209,7 +220,7 @@ class DBOperator:
     def unsubscribe(self, telegram_id, slave_nickname):
 
         user_id = self._get_user_id(telegram_id)
-        slave_id = self.get_slave_id(slave_nickname)
+        slave_id = self._get_slave_id(slave_nickname)
 
         try:
             query = "DELETE FROM subscriptions WHERE user_id=%s AND slave_id=%s;"
@@ -225,7 +236,7 @@ class DBOperator:
         user_full_name = message.from_user.full_name
         user_telegram_nick = message.from_user.name
         date = message.date
-        text = message.text
+        text = md5(message.text.encode()).hexdigest()
 
         fields = [user_telegram_id, message_id, user_full_name,
                   user_telegram_nick, date, text]
@@ -250,7 +261,7 @@ class DBOperator:
             self._conn.rollback()
             raise ValueError("User %d not found" % telegram_id)
 
-    def get_slave_id(self, slave_nickname):
+    def _get_slave_id(self, slave_nickname):
         try:
             self._c.execute("select slaves.slave_id from slaves where slaves.slave_nickname=%s", [slave_nickname])
             return self._c.fetchall()[0][0]

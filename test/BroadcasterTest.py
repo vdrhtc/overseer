@@ -5,7 +5,6 @@ import unittest
 from unittest.mock import Mock, call, MagicMock
 
 from telegram import ParseMode
-from telegram.ext import Updater, Dispatcher
 
 from src.Broadcaster import Broadcaster
 from src.DBOperator import DBOperator

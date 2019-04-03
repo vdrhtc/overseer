@@ -130,6 +130,26 @@ class DBOperatorTest(unittest.TestCase):
         self.assertListEqual([slave.to_tuple()], slaves)
 
 
+
+    def testGetSlave(self):
+
+        slave = SlaveMock()
+
+        self._sut.add_slave(slave)
+
+        slave_from_db = self._sut.get_slave(slave.nickname)
+
+        slave.password = md5(slave.password.encode()).hexdigest()
+
+        self.assertEqual(slave.to_tuple(), slave_from_db)
+
+        try:
+            self._sut.get_slave("missing_slave")
+        except ValueError:
+            return
+        else:
+            assert False
+
     def testSubscribe(self):
 
         telegram_id = 123459
@@ -244,4 +264,4 @@ class DBOperatorTest(unittest.TestCase):
         self.assertEqual(message_repr[2], "Korenkov Alex")
         self.assertEqual(message_repr[3], "@lox")
         self.assertEqual(message_repr[4], message.date)
-        self.assertEqual(message_repr[5], "I am a lox")
+        self.assertEqual(message_repr[5], md5("I am a lox".encode()).hexdigest())
