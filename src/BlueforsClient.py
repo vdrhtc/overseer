@@ -87,6 +87,7 @@ class BlueforsClient:
         else:
             print(response)
             self._current_strategy = "reconnect"
+            sleep(15)
 
     def generate_info_message(self):
         on_off = {"0": "⚪️", "1": "🔵", "2": '🌕'}
