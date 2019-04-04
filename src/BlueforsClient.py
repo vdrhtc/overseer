@@ -50,7 +50,7 @@ class BlueforsClient:
         while not self._stop:
             try:
                 self._strategies[self._current_strategy]()
-            except TimeoutError as e:
+            except (TimeoutError, ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError, ConnectionError) as e:
                 self._logger.warn(str(e))
                 sleep(15)
                 self._current_strategy = "reconnect"
@@ -66,21 +66,17 @@ class BlueforsClient:
             data = self.generate_info_message().encode()
         except Exception as e:
             data = str(e).encode()
-        try:
-            self._secure_socket.send(data)
-            sleep(15)
-        except (ConnectionResetError, ConnectionAbortedError, ConnectionError):
-            self._current_strategy = "reconnect"
+
+        self._secure_socket.send(data)
+        sleep(15)
 
     def _reconnect(self):
         print("\rReconnecting...", end="")
-        try:
-            self._secure_socket.close()
-            self._secure_socket = self._context.wrap_socket(socket.socket())
-            self._secure_socket.connect((self._server_address, self._server_port))  # connect to the server
-            self._current_strategy = "handshake"
-        except ConnectionRefusedError:
-            sleep(15)
+        
+        self._secure_socket.close()
+        self._secure_socket = self._context.wrap_socket(socket.socket())
+        self._secure_socket.connect((self._server_address, self._server_port))  # connect to the server
+        self._current_strategy = "handshake"
 
     def _handshake(self):
         self._secure_socket.send(self._nickname.encode())
