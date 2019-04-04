@@ -15,9 +15,10 @@ from src.LoggingServer import LoggingServer
 
 class BlueforsClient:
 
-    def __init__(self, nickname, server_address, server_port, logs_path):
+    def __init__(self, nickname, password, server_address, server_port, logs_path):
 
         self._server_address = server_address
+        self._password = password
         self._server_port = server_port
         self._logs_path = logs_path
         self._nickname = nickname
@@ -79,7 +80,7 @@ class BlueforsClient:
         self._current_strategy = "handshake"
 
     def _handshake(self):
-        self._secure_socket.send(self._nickname.encode())
+        self._secure_socket.send((self._nickname+"\r\n"+self._password).encode())
         response = self._secure_socket.recv(1024).decode()
         if response == self._nickname:
             self._current_strategy = "update"
