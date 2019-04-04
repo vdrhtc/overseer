@@ -86,7 +86,7 @@ class BlueforsClient:
             self._current_strategy = "update"
             print("Successful handshake!")
         else:
-            print(response)
+            print(" "+response, end="")
             self._current_strategy = "reconnect"
             sleep(15)
 
