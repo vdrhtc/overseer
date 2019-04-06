@@ -1,8 +1,5 @@
 import unittest
 from unittest.mock import Mock
-
-import psycopg2
-from psycopg2 import ProgrammingError
 from hashlib import md5
 
 from src.Overseer import *
@@ -15,12 +12,11 @@ class OverseerTest(unittest.TestCase):
 
     def setUp(self):
         # instantiate logger with test argument
-        LoggingServer.getInstance(test=True)
+        LoggingServer.getInstance("overseer", test=True)
 
         self._broadcaster = Mock()
         self._update_server = Mock()
         self._update_server.get_latest_state = Mock(return_value="TEST STATE")
-        self._broadcaster.get_lock = Mock(return_value=Lock())
         self._broadcaster.get_update_server = Mock(return_value=self._update_server)
 
         self._db_operator = DBOperator("overseer_test", "inlatexbot", "inlatexbot", drop_key="r4jYi1@")

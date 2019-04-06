@@ -3,11 +3,10 @@ import socket
 import ssl
 from enum import Enum, auto
 from hashlib import md5
-
-from threading import Thread, Lock
+from loggingserver import LoggingServer
+from threading import Thread
 
 from src.DBOperator import DBOperator
-from src.LoggingServer import LoggingServer
 from src.ResourceManager import ResourceManager
 
 
@@ -32,7 +31,7 @@ class UpdateServer:
         self._secure_socket = None
         self._tls_context = tls_context
 
-        self._logger = LoggingServer.getInstance()
+        self._logger = LoggingServer.getInstance("overseer-update-server")
 
         self._latest_states = {}
 
@@ -43,7 +42,7 @@ class UpdateServer:
         self._connection_to_dispatch = None
 
         self._heartbeat_message_interval = 10
-        self._heartbeat_interval_counter = 0
+        self._heartbeat_interval_counters = {}
 
 
     def launch(self):
@@ -93,8 +92,8 @@ class UpdateServer:
         self._state = ServerState.ACCEPT
 
     def _authenticate_slave(self, nickname, password):
-
         slave = self._db_operator.get_slave(nickname)
+
         md5_pass = md5(password.encode()).hexdigest()
         if slave.slave_password == md5_pass and password != "":
             return True
@@ -107,15 +106,17 @@ class UpdateServer:
             slave_nickname, slave_password = connection.recv(1024).decode().split("\r\n")
 
             if not self._authenticate_slave(slave_nickname, slave_password):
-                connection.send("Authentication failed")
                 raise ValueError("Wrong username/password!")
 
-        except Exception as e:
+        except ValueError as e:
             self._logger.warn("Authentication failed, %s" % str(e))
+            connection.send(("Authentication failed: " + e.args[0]).encode())
             return
 
         connection.send(slave_nickname.encode())
         self._logger.debug("Successful handshake with %s" % str(slave_nickname))
+
+        self._heartbeat_interval_counters[slave_nickname] = 0
 
         for data in self._update_generator(connection, slave_nickname):
             self._latest_states[slave_nickname] = data
@@ -134,12 +135,13 @@ class UpdateServer:
             self._logger.debug("Emtpy data from %s, closing" % str(slave_nickname))
 
     def _log_heartbeat(self, slave_nickname, address, length):
-        if self._heartbeat_interval_counter % self._heartbeat_message_interval == 0:
+        if self._heartbeat_interval_counters[slave_nickname] %\
+                self._heartbeat_message_interval == 0:
             self._logger.debug("State update from %s (%s) of length %d" %
                                (slave_nickname, address[0], length))
-            self._heartbeat_interval_counter = 0
+            self._heartbeat_interval_counters[slave_nickname] = 0
 
-        self._heartbeat_interval_counter += 1
+        self._heartbeat_interval_counters[slave_nickname] += 1
 
     def get_latest_state(self, slave_nickname):
         try:

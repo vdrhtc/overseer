@@ -1,16 +1,11 @@
-import subprocess
 from collections import namedtuple
-
 from telegram import *
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
-from threading import Lock
-import pickle
+from loggingserver import LoggingServer
 
 from src.DBOperator import DBOperator
-from src.LoggingServer import LoggingServer
 from src.ResourceManager import ResourceManager
 
-from src.LoggingServer import LoggingServer
 from enum import Enum, auto
 
 
@@ -40,7 +35,7 @@ class Overseer:
         self._updater = broadcaster.get_telegram_updater()
 
         self._resource_manager = ResourceManager()
-        self._logger = LoggingServer.getInstance()
+        self._logger = LoggingServer.getInstance("overseer")
 
         self._updater.dispatcher.add_handler(CommandHandler('start', self.on_start))
         self._updater.dispatcher.add_handler(CommandHandler('help', self.on_help))
@@ -54,7 +49,7 @@ class Overseer:
         self._updater.dispatcher.add_handler(CallbackQueryHandler(self.on_callback))
         self._message_filters = [self._filter_slave_registration]
 
-        self._logger = LoggingServer.getInstance()
+        self._logger = LoggingServer.getInstance("overseer")
 
         self._slave_registration_conversations = {}
         self._slave_registration_data = {}

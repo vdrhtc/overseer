@@ -8,7 +8,7 @@ from telegram import ParseMode
 
 from src.Broadcaster import Broadcaster
 from src.DBOperator import DBOperator
-from src.LoggingServer import LoggingServer
+from loggingserver import LoggingServer
 from test.SlaveMock import SlaveMock
 from test.UserMock import UserMock
 
@@ -16,7 +16,7 @@ from test.UserMock import UserMock
 class BroadcasterTest(unittest.TestCase):
 
     def setUp(self):
-        LoggingServer.getInstance(test=True)
+        LoggingServer.getInstance("broadcaster", test=True)
 
         self._telegram_updater = Mock()
 

@@ -8,7 +8,7 @@ from telegram.error import BadRequest, TimedOut, NetworkError
 from telegram.ext import Updater, run_async
 
 from src.DBOperator import DBOperator
-from src.LoggingServer import LoggingServer
+from loggingserver import LoggingServer
 from src.ResourceManager import ResourceManager
 
 
@@ -19,8 +19,7 @@ class Broadcaster:
 
         :type update_server: src.UpdateServer.UpdateServer
         """
-        self._lock = Lock()
-        self._logger = LoggingServer.getInstance()
+        self._logger = LoggingServer.getInstance("overseer-broadcaster")
         self._stop = False
         self._telegram_updater = telegram_updater
         self._update_server = update_server
@@ -81,6 +80,8 @@ class Broadcaster:
         slave_nickname, info_message_id = subscription
         message = self._update_server.get_latest_state(slave_nickname)
 
+
+
         try:
             self._telegram_updater.bot.edit_message_text(message,
                                                          user.telegram_id,
@@ -89,7 +90,7 @@ class Broadcaster:
             return user, subscription, None
         except BadRequest as e:
             if message != self._resource_manager.get_string("slave_not_connected") % slave_nickname:
-                if e.message != "Message is not modified" and e.message != "Network error":
+                if e.message != "Message is not modified":
                     self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
             return user, subscription, e
         except TimedOut as e:
