@@ -3,6 +3,12 @@
 /subscribe slave_nickname - subscribe to updates from the slave (the message you will receive will be constantly edited)
 /unsubscribe slave_nickname - remove slave's updates from your sight
 /checkout slave_nickname - see slave's state once
+/register_slave - register a new slave (see below)
+
+<b>Connecting your slave</b>
+
+To monitor your own system, you will need to create a client application that will generate status messages and send them to Overseer. It should connect to a remote server at <i>triangle.enricherclub.com:5000</i> through a TLS socket and authenticate. Afterwards, the server will start to listen for the updates from your slave and transmit them to the subscribers.
+The command /register_slave will let you set a custom nickname/password pair for the authentication; without the registration, the connection from the client won't be accepted.
 
 <b>Slave-specific commands</b>
 
