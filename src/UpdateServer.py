@@ -68,16 +68,17 @@ class UpdateServer:
         except Exception as e:
             print("UpdatesServer died: ", e, datetime.datetime.now())
             self._logger.warn("UpdateServer is going down: " + str(e))
+            self._stop = True
         finally:
             self._secure_socket.close()
 
     def _accept_connection(self):
-        conn, address = self._secure_socket.accept()  # accept new connection
-        self._logger.info("Connection from: " + str(address))
         try:
+            conn, address = self._secure_socket.accept()  # accept new connection
+            self._logger.info("Connection from: " + str(address))
             connstream = self._tls_context.wrap_socket(conn, server_side=True)
-        except ssl.SSLError as e:
-            self._logger.warn("UpdateServer: " + str(e))
+        except (ssl.SSLError, ConnectionError) as e:
+            self._logger.warn("UpdateServer: " + str(e) + repr(e))
             return
 
         self._connection_to_dispatch = (connstream, address)
