@@ -3,7 +3,7 @@ from threading import Lock, Thread
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 
-from telegram import ParseMode
+from telegram import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.error import BadRequest, TimedOut, NetworkError
 from telegram.ext import Updater, run_async
 
@@ -78,25 +78,25 @@ class Broadcaster:
         user, subscription = target
 
         slave_nickname, info_message_id = subscription
-        message = self._update_server.get_latest_state(slave_nickname)
-
-
-
+        state = self._update_server.get_latest_state(slave_nickname)
         try:
-            self._telegram_updater.bot.edit_message_text(message,
+            self._telegram_updater.bot.edit_message_text(state.get_state_message(),
                                                          user.telegram_id,
                                                          info_message_id,
                                                          parse_mode=ParseMode.MARKDOWN)
+            if state.get_alert() != "":
+                alert_message = state.get_alert_message()
+                reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK",
+                                                                           callback_data="OK")]])
+                self._telegram_updater.bot.send_message(user.telegram_id,
+                                                        alert_message,
+                                                        parse_mode=ParseMode.MARKDOWN,
+                                                        reply_markup=reply_markup)
             return user, subscription, None
         except BadRequest as e:
-            if message != self._resource_manager.get_string("slave_not_connected") % slave_nickname:
-                if e.message != "Message is not modified":
-                    self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
+            if e.message != "Message is not modified":
+                self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
             return user, subscription, e
-        except TimedOut as e:
-            self._logger.warn("Timed out updating %d, %s" % (user.telegram_id, slave_nickname))
-            return user, subscription, e
-        except NetworkError as e:
-            self._logger.warn("Network error %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
+        except (TimedOut, NetworkError) as e:
             return user, subscription, e
 

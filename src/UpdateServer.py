@@ -8,6 +8,7 @@ from threading import Thread
 
 from src.DBOperator import DBOperator
 from src.ResourceManager import ResourceManager
+from src.SlaveState import SlaveState
 
 
 class ServerState(Enum):
@@ -120,7 +121,7 @@ class UpdateServer:
         self._heartbeat_interval_counters[slave_nickname] = 0
 
         for data in self._update_generator(connection, slave_nickname):
-            self._latest_states[slave_nickname] = data
+            self._latest_states[slave_nickname] = SlaveState(slave_nickname, data)
             self._log_heartbeat(slave_nickname, address, len(data))
 
         connection.close()
@@ -148,4 +149,5 @@ class UpdateServer:
         try:
             return self._latest_states[slave_nickname]
         except KeyError:
-            return self._rm.get_string("slave_not_connected") % slave_nickname
+            return SlaveState(slave_nickname,
+                              self._rm.get_string("slave_not_connected") % slave_nickname)

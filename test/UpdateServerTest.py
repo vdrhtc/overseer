@@ -64,8 +64,11 @@ class UpdateServerTest(unittest.TestCase):
         self._db_operator.get_slave = MagicMock(return_value=slave_from_db)
 
         self._sut._communicate(conn, MagicMock())
+        state = self._sut._latest_states[slave.nickname]
+        expected_state = SlaveState("slave1", "state")
+        state._received_at = expected_state._received_at
 
-        self.assertEqual(self._sut._latest_states[slave.nickname], "state")
+        self.assertEqual(state, expected_state)
 
 
         conn.recv = MagicMock(side_effect=["slave2\r\npassss@".encode(),
