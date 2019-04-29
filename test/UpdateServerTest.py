@@ -9,7 +9,7 @@ from test.SlaveMock import SlaveMock
 class UpdateServerTest(unittest.TestCase):
 
     def setUp(self):
-        LoggingServer.getInstance("overseer-update-server", test=True)
+        LoggingServer.getInstance("overseer", test=True)
 
         self._tls_context = MagicMock()
         self._db_operator = MagicMock()

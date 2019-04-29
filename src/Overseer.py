@@ -49,8 +49,6 @@ class Overseer:
         self._updater.dispatcher.add_handler(CallbackQueryHandler(self.on_callback))
         self._message_filters = [self._filter_slave_registration]
 
-        self._logger = LoggingServer.getInstance("overseer")
-
         self._slave_registration_conversations = {}
         self._slave_registration_data = {}
         self._slave_registration_functions = {SlaveRegistrationStages.SLAVE_NAME: self._register_slave_name,

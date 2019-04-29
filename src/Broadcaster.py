@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 
 from telegram import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.error import BadRequest, TimedOut, NetworkError
+from telegram.error import BadRequest, TimedOut, NetworkError, RetryAfter
 from telegram.ext import Updater, run_async
 
 from src.DBOperator import DBOperator
@@ -19,7 +19,7 @@ class Broadcaster:
 
         :type update_server: src.UpdateServer.UpdateServer
         """
-        self._logger = LoggingServer.getInstance("overseer-broadcaster")
+        self._logger = LoggingServer.getInstance("overseer")
         self._stop = False
         self._telegram_updater = telegram_updater
         self._update_server = update_server
@@ -95,8 +95,8 @@ class Broadcaster:
             return user, subscription, None
         except BadRequest as e:
             if e.message != "Message is not modified":
-                self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + str(e))
+                self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + e.message)
             return user, subscription, e
-        except (TimedOut, NetworkError) as e:
+        except (TimedOut, NetworkError, RetryAfter) as e:
             return user, subscription, e
 

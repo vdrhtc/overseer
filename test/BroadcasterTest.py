@@ -19,7 +19,7 @@ from test.UserMock import UserMock
 class BroadcasterTest(unittest.TestCase):
 
     def setUp(self):
-        LoggingServer.getInstance("broadcaster", test=True)
+        LoggingServer.getInstance("overseer", test=True)
 
         self._telegram_updater = Mock()
 

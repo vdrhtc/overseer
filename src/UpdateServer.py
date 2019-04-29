@@ -32,7 +32,7 @@ class UpdateServer:
         self._secure_socket = None
         self._tls_context = tls_context
 
-        self._logger = LoggingServer.getInstance("overseer-update-server")
+        self._logger = LoggingServer.getInstance("overseer")
 
         self._latest_states = {}
 
@@ -67,8 +67,8 @@ class UpdateServer:
             while not self._stop:
                 self._strategies[self._state]()
         except Exception as e:
-            print("UpdatesServer died: ", e, datetime.datetime.now())
-            self._logger.warn("UpdateServer is going down: " + str(e))
+            self._logger.warn("UpdateServer is going down: " + str(e) +
+                              repr(e) + str(type(e)))
             self._stop = True
         finally:
             self._secure_socket.close()
@@ -78,8 +78,8 @@ class UpdateServer:
             conn, address = self._secure_socket.accept()  # accept new connection
             self._logger.info("Connection from: " + str(address))
             connstream = self._tls_context.wrap_socket(conn, server_side=True)
-        except (ssl.SSLError, ConnectionError) as e:
-            self._logger.warn("UpdateServer: " + str(e) + repr(e))
+        except (ssl.SSLError, ConnectionError, socket.error) as e:
+            self._logger.warn("UpdateServer: " + str(e))
             return
 
         self._connection_to_dispatch = (connstream, address)
