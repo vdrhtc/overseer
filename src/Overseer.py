@@ -44,6 +44,7 @@ class Overseer:
         self._updater.dispatcher.add_handler(CommandHandler('subscribe', self.on_subscribe))
         self._updater.dispatcher.add_handler(CommandHandler('unsubscribe', self.on_unsubscribe))
         self._updater.dispatcher.add_handler(CommandHandler('register_slave', self.on_register_slave))
+        self._updater.dispatcher.add_handler(CommandHandler('abort', self.on_abort))
 
         self._updater.dispatcher.add_handler(MessageHandler(Filters.text, callback=self.on_message))
         self._updater.dispatcher.add_handler(CallbackQueryHandler(self.on_callback))
@@ -151,6 +152,20 @@ class Overseer:
         self._log_user_action("/register_slave", update.message.from_user)
         self._slave_registration_conversations[update.message.from_user.id] = SlaveRegistrationStages.SLAVE_NAME
         update.message.reply_text(self._resource_manager.get_string("slave_registration_started"))
+
+
+    def on_abort(self, bot, update):
+        user_id = update.message.from_user.id
+        if user_id in self._slave_registration_conversations.keys():
+            self._slave_registration_conversations.pop(user_id)
+            try:
+                self._slave_registration_data.pop(user_id)
+            except KeyError:
+                pass  # no data were here yet
+
+            update.message.reply_text(self._resource_manager.get_string("conversation_aborted"))
+        else:
+            update.message.reply_text(self._resource_manager.get_string("nothing_to_abort"))
 
     def on_message(self, bot, update):
         self._log_user_action("A message was received", update.message.from_user)

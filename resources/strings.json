@@ -9,6 +9,7 @@
   "slave_name_too_long": "Slave name too long! Max 50 chars allowed",
   "slave_registered": "Slave successfully registered",
   "slave_registration_started": "Please, tell me the slave's nickname",
-  "slave_registration_password": "The nickname was chosen! Now, tell me the password for the slave."
-
+  "slave_registration_password": "The nickname was chosen! Now, tell me the password for the slave",
+  "conversation_aborted": "The current conversation was aborted!",
+  "nothing_to_abort": "Nothing to abort"
 }
