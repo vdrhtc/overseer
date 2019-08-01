@@ -24,8 +24,6 @@ class BroadcasterTest(unittest.TestCase):
         self._telegram_updater = Mock()
 
         self._update_server = Mock()
-        self._mock_slave_state = SlaveState("slave1", "TEST STATE")
-        self._mock_slave_state = SlaveState("slave2", "TEST STATE")
 
         self._db_operator = DBOperator("overseer_test", "inlatexbot", "inlatexbot",
                                        drop_key="r4jYi1@")
@@ -46,7 +44,8 @@ class BroadcasterTest(unittest.TestCase):
 
         self._slaves = []
         self._slave_states = {}
-        self._slave_state_raw_messages = ["TEST", "2018-01-01 00:00:00\r\ntest\r\nALERT!"]
+        self._slave_state_raw_messages = ["TEST", '{"state":"test state", "sent_at":"1996-01-01 00:00:00",' \
+                                                  ' "alerts":["SLAVE failing","","SLAVE died"]}']
         state_cycle = itertools.cycle(self._slave_state_raw_messages)
         for i in range(10):
             slave = SlaveMock("slave%d" % i, "0.0.0.%d" % i)
@@ -89,20 +88,22 @@ class BroadcasterTest(unittest.TestCase):
                     edit_message_text.assert_has_calls([call(*args,
                                                              parse_mode=ParseMode.MARKDOWN)])
 
-                args = user.id, state.get_alert_message()
+                alerts = state.get_alerts()
+
                 reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK",
                                                                            callback_data="OK")]])
+                for alert in alerts:
+                    args = user.id, state.get_alert_message(alert)
 
-                if state.get_alert() != "":
+                    if alert != "":
+                        self._telegram_updater.bot. \
+                            send_message.assert_has_calls([call(*args,
+                                                                parse_mode=ParseMode.MARKDOWN,
+                                                                reply_markup=reply_markup)])
+                    else:
+                        unexpected_call = call(*args,
+                                               parse_mode=ParseMode.MARKDOWN,
+                                               reply_markup=reply_markup)
+                        calls = self._telegram_updater.bot.send_message.mock_calls
 
-                    self._telegram_updater.bot. \
-                        send_message.assert_has_calls([call(*args,
-                                                            parse_mode=ParseMode.MARKDOWN,
-                                                            reply_markup=reply_markup)])
-                else:
-                    unexpected_call = call(*args,
-                                           parse_mode=ParseMode.MARKDOWN,
-                                           reply_markup=reply_markup)
-                    calls = self._telegram_updater.bot.send_message.mock_calls
-
-                    self.assertNotIn(unexpected_call, calls)
+                        self.assertNotIn(unexpected_call, calls)

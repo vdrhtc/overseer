@@ -84,17 +84,20 @@ class Broadcaster:
                                                          user.telegram_id,
                                                          info_message_id,
                                                          parse_mode=ParseMode.MARKDOWN)
-            if state.get_alert() != "":
-                alert_message = state.get_alert_message()
-                reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK",
-                                                                           callback_data="OK")]])
-                self._telegram_updater.bot.send_message(user.telegram_id,
-                                                        alert_message,
-                                                        parse_mode=ParseMode.MARKDOWN,
-                                                        reply_markup=reply_markup)
+            alerts = state.get_alerts()
+            for alert in alerts:
+                if alert != "":
+                    alert_message = state.get_alert_message(alert)
+                    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("OK",
+                                                                               callback_data="OK")]])
+                    self._telegram_updater.bot.send_message(user.telegram_id,
+                                                            alert_message,
+                                                            parse_mode=ParseMode.MARKDOWN,
+                                                            reply_markup=reply_markup)
             return user, subscription, None
         except BadRequest as e:
-            if e.message != "Message is not modified":
+            if e.message != "Message is not modified: specified new message content and reply markup " \
+                            "are exactly the same as a current content and reply markup of the message":
                 self._logger.warn("Error for user %d, %s: " % (user.telegram_id, slave_nickname) + e.message)
             return user, subscription, e
         except (TimedOut, NetworkError, RetryAfter) as e:

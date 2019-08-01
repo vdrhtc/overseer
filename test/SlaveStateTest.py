@@ -15,9 +15,11 @@ class SlaveStateTest(unittest.TestCase):
         self._dt_mock.now = self._now_mock
 
         self._raw_msg_1 = "test"
-        self._raw_msg_2 = "1996-01-01 00:00:00\r\ntest state\r\nSLAVE failing!"
+        self._raw_msg_2 = '{"state":"test state", "sent_at":"1996-01-01 00:00:00",' \
+                          ' "alerts":["SLAVE failing","","SLAVE died"]}'
 
         self._slave_nick = "slave1"
+
 
     def testGetStateMessage(self):
 
@@ -39,6 +41,13 @@ class SlaveStateTest(unittest.TestCase):
         with patch("datetime.datetime", new = self._dt_mock):
             self._sut = SlaveState(self._slave_nick, self._raw_msg_2)
 
-        self.assertEqual(self._sut.get_alert_message(), '2018-01-01 00:00:00 - slave1\n'
-                                                'Alert! SLAVE failing!')
+        alerts = self._sut.get_alerts()
 
+        self.assertEqual(["SLAVE failing", "", "SLAVE died"], alerts)
+
+        for alert in alerts:
+            if alert is not "":
+                self.assertEqual(self._sut.get_alert_message(alert), '2018-01-01 00:00:00 - slave1\n'
+                                                    'Alert! %s'%alert)
+            else:
+                self.assertEqual(self._sut.get_alert_message(alert), None)

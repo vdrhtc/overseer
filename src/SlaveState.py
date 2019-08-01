@@ -1,4 +1,6 @@
 import datetime
+import json
+from json import JSONDecodeError
 
 
 class SlaveState:
@@ -14,33 +16,29 @@ class SlaveState:
 
     def _parse_raw_message(self, raw_message):
 
-        parts = raw_message.split("\r\n")
-
-        if len(parts) == 1:
+        try:
+            data = json.loads(raw_message)
+            self._sent_at = data["sent_at"]  # datetime
+            self._state = data["state"]  # state message
+            self._alerts = data["alerts"]
+        except (JSONDecodeError, KeyError):
             self._sent_at = ""  # datetime
-            self._state = parts[0]  # state message
-            self._alert = ""
-        elif len(parts) == SlaveState.RAW_MESSAGE_PARTS:
-            self._sent_at = parts[0]  # datetime
-            self._state = parts[1]  # state message
-            self._alert = parts[2]
-        else:
-            raise ValueError("Raw message contains %d parts. "
-                             "Expected %d or 1" % (len(parts),
-                                              SlaveState.RAW_MESSAGE_PARTS))
+            self._state = raw_message  # state message
+            self._alerts = ("")
 
     def get_state_message(self):
         return self._received_at.strftime("%Y-%m-%d %H:%M:%S") + \
                " - " + self._slave_nickname + "\n" +\
                self._state
 
-    def get_alert_message(self):
-        return self._received_at.strftime("%Y-%m-%d %H:%M:%S") + \
-               " - " + self._slave_nickname + "\nAlert! " +\
-               self._alert
+    def get_alert_message(self, alert):
+        if alert is not "":
+            return self._received_at.strftime("%Y-%m-%d %H:%M:%S") + \
+                   " - " + self._slave_nickname + "\nAlert! " +\
+                   alert
 
-    def get_alert(self):
-        return self._alert
+    def get_alerts(self):
+        return self._alerts
 
     def __eq__(self, other):
         if type(other) is type(self):
